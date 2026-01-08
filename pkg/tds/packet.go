@@ -146,7 +146,6 @@ func (b *Buffer) ReadUint16() (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
-	fmt.Printf("[DEBUG] ReadUint16: data=%#x, value=%d\n", data, binary.BigEndian.Uint16(data))
 	return binary.BigEndian.Uint16(data), nil
 }
 

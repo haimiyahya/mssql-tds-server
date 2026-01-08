@@ -13,12 +13,14 @@ const (
 )
 
 type Server struct {
-	addr string
+	addr           string
+	queryProcessor *tds.QueryProcessor
 }
 
 func NewServer(port int) *Server {
 	return &Server{
-		addr: fmt.Sprintf(":%d", port),
+		addr:           fmt.Sprintf(":%d", port),
+		queryProcessor: tds.NewQueryProcessor(),
 	}
 }
 
@@ -47,7 +49,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	log.Printf("New connection from %s", conn.RemoteAddr())
 
-	// Read first packet (pre-login)
+	// Read first packet
 	packet, err := s.readPacket(conn)
 	if err != nil {
 		log.Printf("Error reading packet: %v", err)
@@ -64,6 +66,14 @@ func (s *Server) handleConnection(conn net.Conn) {
 			log.Printf("Error handling pre-login: %v", err)
 			return
 		}
+	} else if packet.Header.Type == tds.PacketTypeLogin || packet.Header.Type == 0x12 {
+		// Handle direct login (no pre-login)
+		log.Printf("Handling direct login packet (type=%#02x)", packet.Header.Type)
+		err = s.handleLogin(conn, packet)
+		if err != nil {
+			log.Printf("Error handling login: %v", err)
+			return
+		}
 	}
 
 	// Read subsequent packets
@@ -77,13 +87,18 @@ func (s *Server) handleConnection(conn net.Conn) {
 		log.Printf("Received packet: Type=%#02x, Status=%#02x, Length=%d",
 			packet.Header.Type, packet.Header.Status, packet.Header.Length)
 
-		// Handle login request
-		if packet.Header.Type == tds.PacketTypeLogin {
+		log.Printf("PacketTypeLogin=%#02x, comparing with %#02x", tds.PacketTypeLogin, packet.Header.Type)
+
+		// Handle login request (TDS 7.0+ uses 0x10, some clients use 0x12)
+		if packet.Header.Type == tds.PacketTypeLogin || packet.Header.Type == 0x12 {
+			log.Printf("Handling login packet (type=%#02x)", packet.Header.Type)
 			err = s.handleLogin(conn, packet)
 			if err != nil {
 				log.Printf("Error handling login: %v", err)
 				break
 			}
+		} else {
+			log.Printf("Unknown packet type, skipping...")
 		}
 
 		// Handle SQL batch
@@ -136,8 +151,6 @@ func (s *Server) writePacket(conn net.Conn, packet *tds.Packet) error {
 
 func (s *Server) handlePreLogin(conn net.Conn, packet *tds.Packet) error {
 	log.Println("Handling pre-login request")
-	log.Printf("Packet data length: %d", len(packet.Data))
-	log.Printf("Packet data (hex): %#x", packet.Data)
 
 	// Parse pre-login request
 	req, err := tds.ParsePreLoginRequest(packet.Data)
@@ -172,7 +185,7 @@ func (s *Server) handleLogin(conn net.Conn, packet *tds.Packet) error {
 	// In a full implementation, we would parse the login packet and authenticate
 
 	// Send login acknowledgment
-	// For Phase 1, we'll just send a simple success response
+	// For Phase 2, send both LOGINACK and DONE tokens
 	loginAck := s.buildLoginAckPacket()
 
 	err := s.writePacket(conn, loginAck)
@@ -180,7 +193,14 @@ func (s *Server) handleLogin(conn net.Conn, packet *tds.Packet) error {
 		return fmt.Errorf("failed to send login ack: %w", err)
 	}
 
-	log.Println("Sent login acknowledgment")
+	// Send DONE token to indicate login complete
+	donePacket := s.buildDonePacket()
+	err = s.writePacket(conn, donePacket)
+	if err != nil {
+		return fmt.Errorf("failed to send done packet: %w", err)
+	}
+
+	log.Println("Sent login acknowledgment and done token")
 	return nil
 }
 
@@ -202,21 +222,73 @@ func (s *Server) buildLoginAckPacket() *tds.Packet {
 	return tds.NewPacket(tds.PacketTypeTabular, tds.StatusEOM, 2, buf)
 }
 
+func (s *Server) buildDonePacket() *tds.Packet {
+	// Build a DONE token to indicate login success
+	var buf []byte
+
+	buf = append(buf, 0xFD) // Token type: DONE
+	buf = append(buf, 0x00, 0x10) // Status: FINAL
+	buf = append(buf, 0x00, 0x00) // Current command
+	buf = append(buf, 0x00, 0x00, 0x00, 0x00) // Row count (0)
+
+	return tds.NewPacket(tds.PacketTypeTabular, tds.StatusEOM, 2, buf)
+}
+
+func (s *Server) buildErrorPacket(err error) *tds.Packet {
+	var buf []byte
+
+	// Token type: ERROR (0xAA)
+	buf = append(buf, 0xAA)
+	// Token length (variable)
+	// Error number (4 bytes)
+	buf = append(buf, 0x00, 0x00, 0x00, 0x01) // Error number 1
+	// Error state (1 byte)
+	buf = append(buf, 0x01)
+	// Error severity (1 byte)
+	buf = append(buf, 0x0A) // Severity 10
+	// Error message length (2 bytes)
+	errorMsg := err.Error()
+	msgLen := uint16(len(errorMsg))
+	buf = append(buf, byte(msgLen>>8), byte(msgLen))
+	// Error message
+	buf = append(buf, []byte(errorMsg)...)
+	// Server name length (1 byte)
+	buf = append(buf, 0x00) // Empty server name
+	// Procedure name length (1 byte)
+	buf = append(buf, 0x00) // Empty procedure name
+	// Line number (4 bytes)
+	buf = append(buf, 0x00, 0x00, 0x00, 0x00)
+
+	return tds.NewPacket(tds.PacketTypeTabular, tds.StatusEOM, 3, buf)
+}
+
 func (s *Server) handleSQLBatch(conn net.Conn, packet *tds.Packet) error {
-	log.Printf("Handling SQL batch: %s", string(packet.Data))
+	query := string(packet.Data)
+	log.Printf("Handling SQL batch: %s", query)
 
-	// For Phase 2, we'll implement simple query processing
-	// For Phase 1, we just log it
+	// Process the query using the query processor
+	results, err := s.queryProcessor.ExecuteSQLBatch(query)
+	if err != nil {
+		log.Printf("Error processing query: %v", err)
 
-	// Send a simple result set
-	resultPacket := s.buildResultPacket([][]string{{"HELLO", "WORLD"}})
+		// Send error response
+		errPacket := s.buildErrorPacket(err)
+		writeErr := s.writePacket(conn, errPacket)
+		if writeErr != nil {
+			return fmt.Errorf("failed to send error packet: %w", writeErr)
+		}
 
-	err := s.writePacket(conn, resultPacket)
+		return fmt.Errorf("query processing error: %w", err)
+	}
+
+	// Send result set
+	resultPacket := s.buildResultPacket(results)
+	err = s.writePacket(conn, resultPacket)
 	if err != nil {
 		return fmt.Errorf("failed to send result: %w", err)
 	}
 
-	log.Println("Sent result packet")
+	log.Printf("Sent result packet with %d rows", len(results))
 	return nil
 }
 

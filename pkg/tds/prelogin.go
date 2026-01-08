@@ -56,8 +56,6 @@ func ParsePreLoginRequest(data []byte) (*PreLoginRequest, error) {
 			return nil, fmt.Errorf("error reading token type at iteration %d: %w", i, err)
 		}
 
-		fmt.Printf("[DEBUG] Iteration %d: tokenType=0x%02x, bufferLen=%d\n", i, tokenType, buf.Len())
-
 		if PreLoginToken(tokenType) == TokenTerminator {
 			break
 		}
@@ -71,8 +69,6 @@ func ParsePreLoginRequest(data []byte) (*PreLoginRequest, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error reading length at iteration %d: %w", i, err)
 		}
-
-		fmt.Printf("[DEBUG] Option %d: type=0x%02x, offset=%d, length=%d\n", i, tokenType, offset, length)
 
 		options = append(options, &PreLoginOption{
 			TokenType: PreLoginToken(tokenType),

@@ -12,13 +12,13 @@ const (
 	server   = "127.0.0.1"
 	port     = 1433
 	database = ""
-	username = ""
+	username = "sa"
 	password = ""
 )
 
 func main() {
 	// Build connection string
-	connString := fmt.Sprintf("server=%s;port=%d;database=%s;user id=%s;password=%s;encrypt=disable;trustservercertificate=true",
+	connString := fmt.Sprintf("server=%s;port=%d;database=%s;user id=%s;password=%s",
 		server, port, database, username, password)
 
 	log.Printf("Connecting to TDS server at %s:%d", server, port)
