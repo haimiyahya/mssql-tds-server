@@ -48,24 +48,23 @@ Build a Microsoft SQL Server-compatible server that implements the TDS (Tabular 
 - Server returns a properly formatted TDS response
 - Client successfully receives and displays the response
 
-### Phase 3: Foundation for Future Project
-**Goal**: Prepare project structure for continuation in a separate project
+### Phase 3: Stored Procedure Handling
+**Goal**: Implement RPC (Remote Procedure Call) handling for stored procedure execution
 
 **Tasks**:
-1. Document the implemented TDS protocol features
-2. Create clean separation between:
-   - TDS protocol layer
-   - Connection management
-   - Query processing interface
-3. Add comprehensive logging and debugging tools
-4. Create test suite for implemented features
-5. Write migration guide for future project
+1. Implement TDS RPC packet parsing (packet type 0x03)
+2. Create stored procedure handler to receive procedure name and parameters
+3. Extract parameters from RPC packets
+4. Implement parameter data type parsing (int, varchar, etc.)
+5. Generate result sets for stored procedure calls
+6. Add support for common stored procedure patterns
 
 **Success Criteria**:
-- Code is well-documented and modular
-- Clear interfaces for extension
-- Comprehensive tests for implemented features
-- Ready for integration with SQLite backend in future project
+- Server receives and parses RPC packets
+- Extracts stored procedure name correctly
+- Extracts parameters with correct data types
+- Returns properly formatted result sets
+- Client can successfully call stored procedures
 
 ## Future Project Scope (To Be Implemented Separately)
 The following phases will be implemented in a future project that will use this project as a foundation:
@@ -130,13 +129,14 @@ The following phases will be implemented in a future project that will use this 
 - Pre-login packet
 - Login acknowledgment
 - SQL batch command
+- RPC (Remote Procedure Call) command
 - Result set responses
 - Error messages (basic)
 
 ## Success Metrics
 - Phase 1: Client can connect without errors
 - Phase 2: Simple echo functionality works end-to-end
-- Phase 3: Clean, documented codebase ready for extension
+- Phase 3: Stored procedure calls work with parameter extraction
 
 ## Notes
 - This is a proof of concept - focus on functionality over optimization
