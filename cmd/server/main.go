@@ -13,14 +13,16 @@ const (
 )
 
 type Server struct {
-	addr           string
-	queryProcessor *tds.QueryProcessor
+	addr                 string
+	queryProcessor       *tds.QueryProcessor
+	storedProcedureHandler *tds.StoredProcedureHandler
 }
 
 func NewServer(port int) *Server {
 	return &Server{
-		addr:           fmt.Sprintf(":%d", port),
-		queryProcessor: tds.NewQueryProcessor(),
+		addr:                 fmt.Sprintf(":%d", port),
+		queryProcessor:       tds.NewQueryProcessor(),
+		storedProcedureHandler: tds.NewStoredProcedureHandler(),
 	}
 }
 
@@ -97,17 +99,23 @@ func (s *Server) handleConnection(conn net.Conn) {
 				log.Printf("Error handling login: %v", err)
 				break
 			}
-		} else {
-			log.Printf("Unknown packet type, skipping...")
-		}
-
-		// Handle SQL batch
-		if packet.Header.Type == tds.PacketTypeSQLBatch {
+		} else if packet.Header.Type == tds.PacketTypeRPC {
+			// Handle RPC (Remote Procedure Call)
+			log.Printf("Handling RPC packet")
+			err = s.handleRPC(conn, packet)
+			if err != nil {
+				log.Printf("Error handling RPC: %v", err)
+				break
+			}
+		} else if packet.Header.Type == tds.PacketTypeSQLBatch {
+			// Handle SQL batch
 			err = s.handleSQLBatch(conn, packet)
 			if err != nil {
 				log.Printf("Error handling SQL batch: %v", err)
 				break
 			}
+		} else {
+			log.Printf("Unknown packet type %#02x, skipping...", packet.Header.Type)
 		}
 	}
 
@@ -344,6 +352,57 @@ func (s *Server) buildResultPacket(rows [][]string) *tds.Packet {
 	buf = append(buf, 0x00, 0x00, 0x00, 0x00, byte(len(rows)))
 
 	return tds.NewPacket(tds.PacketTypeTabular, tds.StatusEOM, 3, buf)
+}
+
+func (s *Server) handleRPC(conn net.Conn, packet *tds.Packet) error {
+	log.Printf("Handling RPC request, data length: %d", len(packet.Data))
+
+	// Parse RPC request
+	rpcReq, err := tds.ParseRPCRequest(packet.Data)
+	if err != nil {
+		log.Printf("Error parsing RPC request: %v", err)
+
+		// Send error response
+		errPacket := s.buildErrorPacket(err)
+		writeErr := s.writePacket(conn, errPacket)
+		if writeErr != nil {
+			return fmt.Errorf("failed to send error packet: %w", writeErr)
+		}
+
+		return fmt.Errorf("RPC parsing error: %w", err)
+	}
+
+	log.Printf("RPC Procedure: %s", rpcReq.ProcName)
+	log.Printf("RPC Parameters: %d", len(rpcReq.Params))
+
+	for i, param := range rpcReq.Params {
+		log.Printf("  Param %d: %s = %v", i+1, param.Name, param.Value)
+	}
+
+	// Execute stored procedure
+	results, err := s.storedProcedureHandler.Execute(rpcReq.ProcName, rpcReq.Params)
+	if err != nil {
+		log.Printf("Error executing stored procedure: %v", err)
+
+		// Send error response
+		errPacket := s.buildErrorPacket(err)
+		writeErr := s.writePacket(conn, errPacket)
+		if writeErr != nil {
+			return fmt.Errorf("failed to send error packet: %w", writeErr)
+		}
+
+		return fmt.Errorf("stored procedure execution error: %w", err)
+	}
+
+	// Send RPC response
+	rpcPacket := tds.BuildRPCResponse(results)
+	err = s.writePacket(conn, rpcPacket)
+	if err != nil {
+		return fmt.Errorf("failed to send RPC response: %w", err)
+	}
+
+	log.Printf("Sent RPC response with %d rows", len(results))
+	return nil
 }
 
 func main() {
