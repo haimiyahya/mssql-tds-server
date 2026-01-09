@@ -4,7 +4,10 @@ A fully-featured Microsoft SQL Server-compatible server implementing the TDS (Ta
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Phase Status](https://img.shields.io/badge/Phase-40%20Complete-brightgreen.svg)](PHASE40_PROGRESS.md)
+[![Phase Status](https://img.shields.io/badge/Phase-43%20Complete-brightgreen.svg)](PHASE43_PROGRESS.md)
+![Authentication](https://img.shields.io/badge/Authentication-Complete-brightgreen.svg)
+![SSL%2FTLS](https://img.shields.io/badge/SSL%2FTLS-Complete-brightgreen.svg)
+![Encryption](https://img.shields.io/badge/Encryption-Complete-brightgreen.svg)
 ![Database Management](https://img.shields.io/badge/Database%20Management-Complete-brightgreen.svg)
 ![Trash%2FRecycle%20Bin](https://img.shields.io/badge/Trash%2FRecycle%20Bin-Complete-brightgreen.svg)
 
@@ -47,7 +50,14 @@ The MSSQL TDS Server is a high-performance, fully-featured database server that 
 
 **Project Status**: ✅ Production Ready
 
-**Latest Phase**: Phase 40 - Database Management (COMPLETE)
+**Latest Phase**: Phase 43 - SSL/TLS Encryption (COMPLETE)
+- SSL/TLS certificate management
+- Self-signed certificate generation
+- SSL/TLS listener creation
+- Pre-login encryption negotiation (OFF/ON/REQUIRED)
+- TLS 1.2/1.3 support
+- Configurable cipher suites
+- Same mechanism as Microsoft SQL Server
 - CREATE DATABASE support
 - DROP DATABASE support (moves to recycle bin/trash)
 - USE DATABASE support
@@ -59,9 +69,9 @@ The MSSQL TDS Server is a high-performance, fully-featured database server that 
 
 **Last Update**: 2024
 
-### Completed Phases (39/39)
+### Completed Phases (43/43)
 
-**Core Phases (1-24)**
+**Core Phases (1-24)
 - ✅ Phase 1: Basic SQL Parser and Executor
 - ✅ Phase 2: TDS Protocol Implementation
 - ✅ Phase 3: Connection Handling
@@ -87,7 +97,7 @@ The MSSQL TDS Server is a high-performance, fully-featured database server that 
 - ✅ Phase 23: Security Enhancements
 - ✅ Phase 24: Documentation and README Update
 
-**Advanced Features Phases (25-39)**
+**Advanced Features Phases (25-43)**
 - ✅ Phase 25: EXPLAIN Query Plan Analysis
 - ✅ Phase 26: Full-Text Search (FTS)
 - ✅ Phase 27: Common Table Expressions (CTE)
@@ -102,7 +112,32 @@ The MSSQL TDS Server is a high-performance, fully-featured database server that 
 - ✅ Phase 36: Migration Tools
 - ✅ Phase 37: Performance Optimization
 - ✅ Phase 38: Monitoring and Alerting
-- ✅ Phase 39: Database Administration UI## Features
+- ✅ Phase 39: Database Administration UI
+- ✅ Phase 40: Database Management and Trash Support
+  - CREATE DATABASE command implementation
+  - DROP DATABASE command (moves to recycle bin/trash)
+  - USE command implementation
+  - sys.databases view implementation
+  - Multi-database queries support
+  - Database-scoped procedure/function storage
+  - Cross-platform trash/recycle bin support (Windows, macOS, Linux)
+  - Restore from trash capability
+- ✅ Phase 41: Authentication System
+  - User/login storage in master.syslogins table
+  - Password hashing with bcrypt (cost=10)
+  - Authentication management (create, drop, modify users)
+  - Login statistics tracking (count, last login)
+  - Account status management (disabled, locked)
+  - Default login (sa) creation
+- ✅ Phase 42: SSL/TLS Encryption Implementation
+  - SSL/TLS certificate management
+  - Self-signed certificate generation
+  - CA-signed certificate support
+  - SSL/TLS listener creation
+  - Pre-login encryption negotiation (OFF/ON/REQUIRED)
+  - TLS 1.2/1.3 support
+  - Configurable cipher suites
+  - Same mechanism as Microsoft SQL Server## Features
 
 ### Core SQL Operations
 
@@ -961,9 +996,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contact
 
-For questions, issues, or contributions, please visit:
-- GitHub: https://github.com/yourusername/mssql-tds-server
-- Issues: https://github.com/yourusername/mssql-tds-server/issues
+For questions, issues, or contributions, please contact:
+- **Author**: Haimiyahya
+- **GitHub**: https://github.com/haimiyahya/mssql-tds-server
+- **Issues**: https://github.com/haimiyahya/mssql-tds-server/issues
+- **Email**: [your-email@example.com]
 
 ---
 
