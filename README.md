@@ -3,7 +3,7 @@
 A Microsoft SQL Server-compatible server implementing the TDS (Tabular Data Stream) protocol with SQLite storage backend.
 
 ## Status
-Proof of Concept - Phase 1, 2, 3 & 4
+Proof of Concept - Phase 1, 2, 3, 4 & 5
 
 ## Overview
 This project implements a minimal TDS server that can accept connections from standard Go mssql clients and handle basic request/response communication, including stored procedure support.
@@ -20,12 +20,14 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
 ├── pkg/             # Package libraries
 │   ├── sqlite/       # SQLite database management
 │   ├── procedure/    # Stored procedure handling
+│   ├── variable/     # Variable context and parsing
 │   └── tds/          # TDS protocol implementation
 └── cmd/             # Server and client applications
     ├── server/       # TDS server implementation
     ├── client/       # Test client using standard mssql driver
     ├── rpctest/      # RPC procedure test client
-    └── proctest/      # Procedure test client
+    ├── proctest/      # Procedure test client
+    └── vartest/       # Variable test client
 ```
 
 ## Completed Phases
@@ -53,18 +55,38 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
 - EXEC command handling
 - DROP PROCEDURE support
 
+### Phase 5: Variables Support ✅
+- Variable declaration parser (DECLARE @var TYPE)
+- Variable context management for procedure execution
+- SET variable assignment
+- SELECT variable assignment
+- Variable reference in SQL replacement
+- Support for basic types (INT, VARCHAR, BIGINT, BIT, etc.)
+- Error handling for undeclared/duplicate variables
+
 **Current Capabilities:**
 - Create stored procedures with simple SQL statements
 - Execute procedures with parameters (INT, VARCHAR, BIT)
 - Parameter replacement in SQL statements
 - Drop stored procedures
 - Error handling for missing/invalid procedures
+- DECLARE variables with various data types
+- SET variable values
+- SELECT variable assignment from queries
+- Variable reference in SQL (WHERE, SELECT lists, etc.)
 
 **Example Usage:**
 ```sql
--- Create procedure
+-- Simple procedure (Phase 4)
 CREATE PROCEDURE GetUserById @id INT
 AS SELECT * FROM users WHERE id = @id
+
+-- Procedure with variables (Phase 5)
+CREATE PROCEDURE GetUserCount @dept VARCHAR(50)
+AS
+    DECLARE @count INT
+    SELECT @count = COUNT(*) FROM users WHERE department = @dept
+    SELECT @count as user_count
 
 -- Execute procedure
 EXEC GetUserById @id=1
@@ -79,7 +101,7 @@ See [PLAN.md](PLAN.md) for implementation phases and tasks.
 ## Future Work
 This project provides the foundation for a full-featured MSSQL-compatible server. Future phases will be implemented progressively:
 
-- **Phase 5**: Variables Support (DECLARE, SET, SELECT @var)
+
 - **Phase 6**: Basic Control Flow (IF/ELSE)
 - **Phase 7**: WHILE Loops
 - **Phase 8**: Temporary Tables (#temp)
