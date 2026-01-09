@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/factory/mssql-tds-server/pkg/auth"
 	"github.com/factory/mssql-tds-server/pkg/database"
 	"github.com/factory/mssql-tds-server/pkg/procedure"
 	"github.com/factory/mssql-tds-server/pkg/sqlexecutor"
@@ -26,6 +27,7 @@ type Server struct {
 	queryProcessor       *tds.QueryProcessor
 	storedProcedureHandler *tds.StoredProcedureHandler
 	sqlExecutor          *sqlexecutor.Executor
+	authManager          *auth.AuthManager
 }
 
 func NewServer(port int, dbPath string) (*Server, error) {
@@ -66,6 +68,18 @@ func NewServer(port int, dbPath string) (*Server, error) {
 	queryProc := tds.NewQueryProcessor()
 	queryProc.SetExecutor(sqlExec)
 
+	// Create authentication manager
+	authMgr, err := auth.NewAuthManager(db.GetDB())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authentication manager: %w", err)
+	}
+
+	// Initialize default logins (sa)
+	err = authMgr.InitializeDefaultLogins()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize default logins: %w", err)
+	}
+
 	return &Server{
 		addr:                 fmt.Sprintf(":%d", port),
 		db:                   db,
@@ -74,6 +88,7 @@ func NewServer(port int, dbPath string) (*Server, error) {
 		queryProcessor:       queryProc,
 		storedProcedureHandler: tds.NewStoredProcedureHandler(),
 		sqlExecutor:          sqlExec,
+		authManager:          authMgr,
 	}, nil
 }
 
@@ -240,11 +255,22 @@ func (s *Server) handlePreLogin(conn net.Conn, packet *tds.Packet) error {
 func (s *Server) handleLogin(conn net.Conn, packet *tds.Packet) error {
 	log.Println("Handling login request")
 
-	// For now, just acknowledge the login
-	// In a full implementation, we would parse the login packet and authenticate
-
+	// Parse login packet to extract username and password
+	// Note: TDS login packet format is complex
+	// For now, we'll use a simple approach:
+	// - Allow all logins (for compatibility)
+	// - In production, parse login packet and authenticate
+	
+	// TODO: Parse TDS login packet (0x10 or 0x12) to extract:
+	// - Username (offset + length)
+	// - Password (offset + length)
+	// - Then authenticate using s.authManager.AuthenticateLogin(username, password)
+	
+	// For now, we'll accept any login (backwards compatibility)
+	// You can create logins using:
+	// INSERT INTO master.syslogins (name, password_hash) VALUES ('user', 'hash')
+	
 	// Send login acknowledgment
-	// For Phase 2, send both LOGINACK and DONE tokens
 	loginAck := s.buildLoginAckPacket()
 
 	err := s.writePacket(conn, loginAck)
