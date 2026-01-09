@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 
+	"github.com/factory/mssql-tds-server/pkg/procedure"
+	"github.com/factory/mssql-tds-server/pkg/sqlite"
 	"github.com/factory/mssql-tds-server/pkg/tds"
 )
 
@@ -14,16 +17,46 @@ const (
 
 type Server struct {
 	addr                 string
+	db                   *sqlite.Database
+	procedureStorage      *procedure.Storage
+	procedureExecutor     *procedure.Executor
 	queryProcessor       *tds.QueryProcessor
 	storedProcedureHandler *tds.StoredProcedureHandler
 }
 
-func NewServer(port int) *Server {
+func NewServer(port int, dbPath string) (*Server, error) {
+	// Initialize SQLite database
+	db, err := sqlite.NewDatabase(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create database: %w", err)
+	}
+
+	// Initialize database tables
+	err = db.Initialize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	// Create procedure storage
+	procStorage, err := procedure.NewStorage(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create procedure storage: %w", err)
+	}
+
+	// Create procedure executor
+	procExecutor, err := procedure.NewExecutor(db, procStorage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create procedure executor: %w", err)
+	}
+
 	return &Server{
 		addr:                 fmt.Sprintf(":%d", port),
+		db:                   db,
+		procedureStorage:      procStorage,
+		procedureExecutor:     procExecutor,
 		queryProcessor:       tds.NewQueryProcessor(),
 		storedProcedureHandler: tds.NewStoredProcedureHandler(),
-	}
+	}, nil
 }
 
 func (s *Server) Start() error {
@@ -274,7 +307,26 @@ func (s *Server) handleSQLBatch(conn net.Conn, packet *tds.Packet) error {
 	query := string(packet.Data)
 	log.Printf("Handling SQL batch: %s", query)
 
-	// Process the query using the query processor
+	// Normalize query
+	query = strings.TrimSpace(query)
+	queryUpper := strings.ToUpper(query)
+
+	// Check for CREATE PROCEDURE
+	if strings.HasPrefix(queryUpper, "CREATE PROCEDURE") || strings.HasPrefix(queryUpper, "CREATE PROC") {
+		return s.handleCreateProcedure(conn, query)
+	}
+
+	// Check for DROP PROCEDURE
+	if strings.HasPrefix(queryUpper, "DROP PROCEDURE") || strings.HasPrefix(queryUpper, "DROP PROC") {
+		return s.handleDropProcedure(conn, query)
+	}
+
+	// Check for EXEC command
+	if strings.HasPrefix(queryUpper, "EXEC ") || strings.HasPrefix(queryUpper, "EXECUTE ") {
+		return s.handleExecProcedure(conn, query)
+	}
+
+	// Default: Process the query using the query processor
 	results, err := s.queryProcessor.ExecuteSQLBatch(query)
 	if err != nil {
 		log.Printf("Error processing query: %v", err)
@@ -297,6 +349,204 @@ func (s *Server) handleSQLBatch(conn net.Conn, packet *tds.Packet) error {
 	}
 
 	log.Printf("Sent result packet with %d rows", len(results))
+	return nil
+}
+
+func (s *Server) handleCreateProcedure(conn net.Conn, query string) error {
+	log.Printf("Handling CREATE PROCEDURE: %s", query)
+
+	// Parse CREATE PROCEDURE statement
+	proc, err := procedure.ParseCreateProcedure(query)
+	if err != nil {
+		log.Printf("Error parsing CREATE PROCEDURE: %v", err)
+
+		// Send error response
+		errPacket := s.buildErrorPacket(err)
+		writeErr := s.writePacket(conn, errPacket)
+		if writeErr != nil {
+			return fmt.Errorf("failed to send error packet: %w", writeErr)
+		}
+
+		return fmt.Errorf("CREATE PROCEDURE parsing error: %w", err)
+	}
+
+	// Store procedure in database
+	err = s.procedureStorage.Create(proc)
+	if err != nil {
+		log.Printf("Error storing procedure: %v", err)
+
+		// Send error response
+		errPacket := s.buildErrorPacket(err)
+		writeErr := s.writePacket(conn, errPacket)
+		if writeErr != nil {
+			return fmt.Errorf("failed to send error packet: %w", writeErr)
+		}
+
+		return fmt.Errorf("procedure storage error: %w", err)
+	}
+
+	// Send success response
+	results := [][]string{
+		{"Procedure created successfully"},
+	}
+	resultPacket := s.buildResultPacket(results)
+	err = s.writePacket(conn, resultPacket)
+	if err != nil {
+		return fmt.Errorf("failed to send result: %w", err)
+	}
+
+	log.Printf("Created procedure: %s", proc.Name)
+	return nil
+}
+
+func (s *Server) handleDropProcedure(conn net.Conn, query string) error {
+	log.Printf("Handling DROP PROCEDURE: %s", query)
+
+	// Extract procedure name
+	// Simple parsing: DROP PROC[EDURE] procname
+	parts := strings.Fields(query)
+	if len(parts) < 3 {
+		err := fmt.Errorf("invalid DROP PROCEDURE syntax")
+		errPacket := s.buildErrorPacket(err)
+		s.writePacket(conn, errPacket)
+		return err
+	}
+
+	procName := parts[2]
+
+	// Drop procedure from database
+	err := s.procedureStorage.Drop(procName)
+	if err != nil {
+		log.Printf("Error dropping procedure: %v", err)
+
+		// Send error response
+		errPacket := s.buildErrorPacket(err)
+		writeErr := s.writePacket(conn, errPacket)
+		if writeErr != nil {
+			return fmt.Errorf("failed to send error packet: %w", writeErr)
+		}
+
+		return fmt.Errorf("procedure drop error: %w", err)
+	}
+
+	// Send success response
+	results := [][]string{
+		{"Procedure dropped successfully"},
+	}
+	resultPacket := s.buildResultPacket(results)
+	err = s.writePacket(conn, resultPacket)
+	if err != nil {
+		return fmt.Errorf("failed to send result: %w", err)
+	}
+
+	log.Printf("Dropped procedure: %s", procName)
+	return nil
+}
+
+func (s *Server) handleExecProcedure(conn net.Conn, query string) error {
+	log.Printf("Handling EXEC: %s", query)
+
+	// Parse EXEC statement
+	procName, paramValues, err := s.parseExecStatement(query)
+	if err != nil {
+		log.Printf("Error parsing EXEC statement: %v", err)
+
+		// Send error response
+		errPacket := s.buildErrorPacket(err)
+		writeErr := s.writePacket(conn, errPacket)
+		if writeErr != nil {
+			return fmt.Errorf("failed to send error packet: %w", writeErr)
+		}
+
+		return fmt.Errorf("EXEC parsing error: %w", err)
+	}
+
+	// Execute procedure
+	results, err := s.procedureExecutor.Execute(procName, paramValues)
+	if err != nil {
+		log.Printf("Error executing procedure: %v", err)
+
+		// Send error response
+		errPacket := s.buildErrorPacket(err)
+		writeErr := s.writePacket(conn, errPacket)
+		if writeErr != nil {
+			return fmt.Errorf("failed to send error packet: %w", writeErr)
+		}
+
+		return fmt.Errorf("procedure execution error: %w", err)
+	}
+
+	// Send result set
+	resultPacket := s.buildResultPacket(results)
+	err = s.writePacket(conn, resultPacket)
+	if err != nil {
+		return fmt.Errorf("failed to send result: %w", err)
+	}
+
+	log.Printf("Executed procedure: %s, returned %d rows", procName, len(results))
+	return nil
+}
+
+func (s *Server) parseExecStatement(query string) (string, map[string]interface{}, error) {
+	// Simple parsing: EXEC procname @param1=value1, @param2=value2
+	query = strings.TrimSpace(query)
+	queryUpper := strings.ToUpper(query)
+
+	// Remove EXEC or EXECUTE
+	if strings.HasPrefix(queryUpper, "EXECUTE ") {
+		query = query[7:]
+	} else if strings.HasPrefix(queryUpper, "EXEC ") {
+		query = query[4:]
+	}
+
+	query = strings.TrimSpace(query)
+
+	// Split by whitespace to get procedure name
+	parts := strings.Fields(query)
+	if len(parts) == 0 {
+		return "", nil, fmt.Errorf("empty EXEC statement")
+	}
+
+	procName := parts[0]
+	paramValues := make(map[string]interface{})
+
+	// Parse parameters if present
+	if len(parts) > 1 {
+		// Join remaining parts and split by comma
+		paramStr := strings.Join(parts[1:], " ")
+		params := strings.Split(paramStr, ",")
+
+		for _, param := range params {
+			param = strings.TrimSpace(param)
+			if param == "" {
+				continue
+			}
+
+			// Parse: @param=value
+			kv := strings.Split(param, "=")
+			if len(kv) != 2 {
+				return "", nil, fmt.Errorf("invalid parameter syntax: %s", param)
+			}
+
+			paramName := strings.TrimSpace(kv[0])
+			paramValue := strings.TrimSpace(kv[1])
+
+			// Remove quotes if present
+			if strings.HasPrefix(paramValue, "'") && strings.HasSuffix(paramValue, "'") {
+				paramValue = paramValue[1 : len(paramValue)-1]
+			}
+
+			paramValues[paramName] = paramValue
+		}
+	}
+
+	return procName, paramValues, nil
+}
+
+func (s *Server) Close() error {
+	if s.db != nil {
+		return s.db.Close()
+	}
 	return nil
 }
 
@@ -406,10 +656,16 @@ func (s *Server) handleRPC(conn net.Conn, packet *tds.Packet) error {
 }
 
 func main() {
-	server := NewServer(defaultPort)
+	dbPath := "./data/tds_server.db"
+
+	server, err := NewServer(defaultPort, dbPath)
+	if err != nil {
+		log.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Close()
 
 	log.Printf("Starting TDS Server on port %d", defaultPort)
-	err := server.Start()
+	err = server.Start()
 	if err != nil {
 		log.Fatalf("Server error: %v", err)
 	}

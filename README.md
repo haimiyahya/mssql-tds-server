@@ -3,10 +3,10 @@
 A Microsoft SQL Server-compatible server implementing the TDS (Tabular Data Stream) protocol with SQLite storage backend.
 
 ## Status
-Proof of Concept - Phase 1, 2 & 3
+Proof of Concept - Phase 1, 2, 3 & 4
 
 ## Overview
-This project implements a minimal TDS server that can accept connections from standard Go mssql clients and handle basic request/response communication.
+This project implements a minimal TDS server that can accept connections from standard Go mssql clients and handle basic request/response communication, including stored procedure support.
 
 ## Plan
 See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
@@ -17,13 +17,72 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
 ├── PLAN.md          # Detailed project plan
 ├── README.md        # This file
 ├── go.mod           # Go module definition
+├── pkg/             # Package libraries
+│   ├── sqlite/       # SQLite database management
+│   ├── procedure/    # Stored procedure handling
+│   └── tds/          # TDS protocol implementation
 └── cmd/             # Server and client applications
-    ├── server/      # TDS server implementation
-    └── client/      # Test client using standard mssql driver
+    ├── server/       # TDS server implementation
+    ├── client/       # Test client using standard mssql driver
+    ├── rpctest/      # RPC procedure test client
+    └── proctest/      # Procedure test client
+```
+
+## Completed Phases
+
+### Phase 1: TDS Protocol Foundation ✅
+- Basic TDS connection and packet parsing
+- Pre-login handshake handling
+- Login acknowledgment
+
+### Phase 2: Basic Request/Response Communication ✅
+- SQL batch command handling
+- Simple query processor with echo functionality
+- Result set formatting
+
+### Phase 3: Stored Procedure Handling (RPC) ✅
+- RPC packet parsing and handling
+- Parameter extraction with data type parsing
+- Multiple stored procedure implementations (SP_HELLO, SP_ECHO, SP_GET_DATA)
+
+### Phase 4: Simple Stored Procedures (MVP) ✅
+- SQLite database initialization for procedure storage
+- CREATE PROCEDURE parser (syntax validation)
+- Procedure storage in SQLite
+- Simple parameter replacement engine
+- EXEC command handling
+- DROP PROCEDURE support
+
+**Current Capabilities:**
+- Create stored procedures with simple SQL statements
+- Execute procedures with parameters (INT, VARCHAR, BIT)
+- Parameter replacement in SQL statements
+- Drop stored procedures
+- Error handling for missing/invalid procedures
+
+**Example Usage:**
+```sql
+-- Create procedure
+CREATE PROCEDURE GetUserById @id INT
+AS SELECT * FROM users WHERE id = @id
+
+-- Execute procedure
+EXEC GetUserById @id=1
+
+-- Drop procedure
+DROP PROCEDURE GetUserById
 ```
 
 ## Development
 See [PLAN.md](PLAN.md) for implementation phases and tasks.
 
 ## Future Work
-This project provides the foundation for a full-featured MSSQL-compatible server. Future phases will be implemented in a separate project building on this codebase.
+This project provides the foundation for a full-featured MSSQL-compatible server. Future phases will be implemented progressively:
+
+- **Phase 5**: Variables Support (DECLARE, SET, SELECT @var)
+- **Phase 6**: Basic Control Flow (IF/ELSE)
+- **Phase 7**: WHILE Loops
+- **Phase 8**: Temporary Tables (#temp)
+- **Phase 9**: Transaction Management (BEGIN TRAN, COMMIT, ROLLBACK)
+
+See [PLAN.md](PLAN.md) for complete roadmap.
