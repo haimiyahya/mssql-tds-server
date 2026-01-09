@@ -1,5 +1,9 @@
 package sqlparser
 
+import (
+	"database/sql"
+)
+
 // StatementType represents the type of SQL statement
 type StatementType int
 
@@ -120,8 +124,9 @@ type DeleteStatement struct {
 
 // CreateTableStatement represents a CREATE TABLE statement
 type CreateTableStatement struct {
-	TableName string
-	Columns   []ColumnDefinition
+	TableName    string
+	Columns      []ColumnDefinition
+	Constraints  []TableConstraint
 }
 
 // DropTableStatement represents a DROP TABLE statement
@@ -181,8 +186,28 @@ type RollbackStatement struct {
 
 // ColumnDefinition represents a column definition in CREATE TABLE
 type ColumnDefinition struct {
-	Name string
-	Type string
+	Name       string
+	Type       string
+	PrimaryKey bool
+	Unique     bool
+	NotNull    bool
+	DefaultValue sql.NullString
+	ForeignKey *ForeignKeyConstraint
+	Check      string
+}
+
+// ForeignKeyConstraint represents a foreign key constraint
+type ForeignKeyConstraint struct {
+	ReferenceTable string
+	ReferenceColumn string
+}
+
+// TableConstraint represents a table-level constraint
+type TableConstraint struct {
+	Type      string // "PRIMARY KEY", "UNIQUE", "FOREIGN KEY", "CHECK"
+	Columns   []string
+	Reference string // For FOREIGN KEY: table_name(column_name)
+	Condition string // For CHECK
 }
 
 // Statement represents a parsed SQL statement

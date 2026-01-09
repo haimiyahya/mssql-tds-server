@@ -1,6 +1,7 @@
 package sqlparser
 
 import (
+	"database/sql"
 	"regexp"
 	"strings"
 )
@@ -594,7 +595,7 @@ func (p *Parser) parseDelete(query string) *Statement {
 
 // parseCreateTable parses a CREATE TABLE statement
 func (p *Parser) parseCreateTable(query string) *Statement {
-	// Format: CREATE TABLE table (column1 type, column2 type, ...)
+	// Format: CREATE TABLE table (column1 type constraints, column2 type constraints, ...)
 
 	upperQuery := strings.ToUpper(query)
 
@@ -625,11 +626,15 @@ func (p *Parser) parseCreateTable(query string) *Statement {
 	columnsPart := query[parenIndex+1 : closingParen]
 	columns := p.parseColumnDefinitions(columnsPart)
 
+	// Parse table-level constraints (will be passed through in RawQuery)
+	constraints := make([]TableConstraint, 0)
+
 	return &Statement{
 		Type: StatementTypeCreateTable,
 		CreateTable: &CreateTableStatement{
-			TableName: tableName,
-			Columns:   columns,
+			TableName:   tableName,
+			Columns:     columns,
+			Constraints: constraints,
 		},
 		RawQuery: query,
 	}
@@ -1107,24 +1112,98 @@ func (p *Parser) parseColumnDefinitions(columnsStr string) []ColumnDefinition {
 			continue
 		}
 
-		// Split by first space to get column name and type
-		parts := strings.Fields(colDef)
-		if len(parts) >= 2 {
-			columnName := parts[0]
-			columnType := strings.Join(parts[1:], " ")
+		// Check if it's a table-level constraint (starts with PRIMARY, UNIQUE, FOREIGN, CHECK)
+		upperColDef := strings.ToUpper(colDef)
+		if strings.HasPrefix(upperColDef, "PRIMARY KEY") ||
+		   strings.HasPrefix(upperColDef, "UNIQUE") ||
+		   strings.HasPrefix(upperColDef, "FOREIGN KEY") ||
+		   strings.HasPrefix(upperColDef, "CHECK") {
+			// Skip table-level constraints (will be parsed separately)
+			continue
+		}
 
-			// Remove constraints (PRIMARY KEY, NOT NULL, etc.)
-			for _, constraint := range []string{"PRIMARY KEY", "NOT NULL", "UNIQUE", "NULL", "DEFAULT"} {
-				if idx := strings.Index(strings.ToUpper(columnType), constraint); idx != -1 {
-					columnType = strings.TrimSpace(columnType[:idx])
+		// Split by first space to get column name and rest
+		spaceIndex := strings.Index(colDef, " ")
+		if spaceIndex == -1 {
+			continue
+		}
+
+		columnName := strings.TrimSpace(colDef[:spaceIndex])
+		columnPart := strings.TrimSpace(colDef[spaceIndex:])
+		upperColumnPart := strings.ToUpper(columnPart)
+
+		// Extract column type (first word)
+		typeSpaceIndex := strings.Index(upperColumnPart, " ")
+		var columnType string
+		if typeSpaceIndex == -1 {
+			columnType = columnPart
+		} else {
+			columnType = strings.TrimSpace(columnPart[:typeSpaceIndex])
+			columnPart = strings.TrimSpace(columnPart[typeSpaceIndex:])
+			upperColumnPart = strings.ToUpper(columnPart)
+		}
+
+		// Parse constraints
+		colDefStruct := ColumnDefinition{
+			Name: columnName,
+			Type: columnType,
+		}
+
+		// PRIMARY KEY
+		if strings.Contains(upperColumnPart, "PRIMARY KEY") {
+			colDefStruct.PrimaryKey = true
+		}
+
+		// NOT NULL
+		if strings.Contains(upperColumnPart, "NOT NULL") {
+			colDefStruct.NotNull = true
+		}
+
+		// UNIQUE
+		if strings.Contains(upperColumnPart, "UNIQUE") {
+			colDefStruct.Unique = true
+		}
+
+		// DEFAULT value
+		if idx := strings.Index(upperColumnPart, "DEFAULT "); idx != -1 {
+			defaultPart := strings.TrimSpace(columnPart[idx+8:]) // 8 = len("DEFAULT ")
+			// Remove quotes if present
+			if (strings.HasPrefix(defaultPart, "'") && strings.HasSuffix(defaultPart, "'")) ||
+			   (strings.HasPrefix(defaultPart, "\"") && strings.HasSuffix(defaultPart, "\"")) {
+				defaultPart = strings.Trim(defaultPart, "'\"")
+			}
+			colDefStruct.DefaultValue = sql.NullString{String: defaultPart, Valid: true}
+		}
+
+		// CHECK constraint
+		if idx := strings.Index(upperColumnPart, "CHECK "); idx != -1 {
+			checkPart := strings.TrimSpace(columnPart[idx+6:]) // 6 = len("CHECK ")
+			// Remove parentheses
+			if strings.HasPrefix(checkPart, "(") && strings.HasSuffix(checkPart, ")") {
+				checkPart = strings.Trim(checkPart, "()")
+			}
+			colDefStruct.Check = checkPart
+		}
+
+		// FOREIGN KEY
+		if idx := strings.Index(upperColumnPart, "REFERENCES "); idx != -1 {
+			refPart := strings.TrimSpace(columnPart[idx+11:]) // 11 = len("REFERENCES ")
+			// Parse table_name(column_name)
+			openParen := strings.Index(refPart, "(")
+			if openParen != -1 {
+				closeParen := strings.LastIndex(refPart, ")")
+				if closeParen != -1 {
+					refTable := strings.TrimSpace(refPart[:openParen])
+					refColumn := strings.TrimSpace(refPart[openParen+1 : closeParen])
+					colDefStruct.ForeignKey = &ForeignKeyConstraint{
+						ReferenceTable:  refTable,
+						ReferenceColumn: refColumn,
+					}
 				}
 			}
-
-			result = append(result, ColumnDefinition{
-				Name: columnName,
-				Type: columnType,
-			})
 		}
+
+		result = append(result, colDefStruct)
 	}
 
 	return result
