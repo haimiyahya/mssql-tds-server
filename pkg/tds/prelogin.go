@@ -17,6 +17,13 @@ const (
 	TokenTerminator   PreLoginToken = 0xFF
 )
 
+// Encryption level constants
+const (
+	EncryptionOff      = 0x00 // No encryption (cleartext)
+	EncryptionOn       = 0x01 // SSL/TLS encryption if supported
+	EncryptionRequired = 0x02 // Encryption required (reject if not supported)
+)
+
 // PreLoginOption represents a pre-login option
 type PreLoginOption struct {
 	TokenType PreLoginToken
@@ -233,10 +240,10 @@ func SerializePreLoginResponse(resp *PreLoginResponse) []byte {
 }
 
 // DefaultPreLoginResponse creates a default pre-login response
-func DefaultPreLoginResponse() *PreLoginResponse {
+func DefaultPreLoginResponse(encryption byte) *PreLoginResponse {
 	return &PreLoginResponse{
 		Version:    []byte{0x09, 0x00, 0x00, 0x00, 0x00, 0x00},
-		Encryption: 0x00, // No encryption
+		Encryption: encryption, // Encryption level (0x00=OFF, 0x01=ON, 0x02=REQUIRED)
 		Instance:   []byte("MSSQLServer"),
 		ThreadID:   []byte{0x00, 0x00, 0x00, 0x00},
 		MARS:       0x00, // No MARS

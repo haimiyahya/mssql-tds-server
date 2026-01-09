@@ -12,6 +12,7 @@ import (
 	"github.com/factory/mssql-tds-server/pkg/sqlexecutor"
 	"github.com/factory/mssql-tds-server/pkg/sqlite"
 	"github.com/factory/mssql-tds-server/pkg/tds"
+	"github.com/factory/mssql-tds-server/pkg/tls"
 )
 
 const (
@@ -28,6 +29,7 @@ type Server struct {
 	storedProcedureHandler *tds.StoredProcedureHandler
 	sqlExecutor          *sqlexecutor.Executor
 	authManager          *auth.AuthManager
+	tlsConfig            *tls.Config
 }
 
 func NewServer(port int, dbPath string) (*Server, error) {
@@ -89,17 +91,32 @@ func NewServer(port int, dbPath string) (*Server, error) {
 		storedProcedureHandler: tds.NewStoredProcedureHandler(),
 		sqlExecutor:          sqlExec,
 		authManager:          authMgr,
+		tlsConfig:            tls.DefaultConfig(),
 	}, nil
 }
 
 func (s *Server) Start() error {
-	listener, err := net.Listen("tcp", s.addr)
-	if err != nil {
-		return fmt.Errorf("failed to listen: %w", err)
+	// Create listener (SSL/TLS or cleartext)
+	var listener net.Listener
+	if tls.IsEncryptionEnabled(s.tlsConfig) {
+		// Create SSL/TLS listener
+		tlsListener, err := tls.CreateTLSListener(s.addr, s.tlsConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create TLS listener: %w", err)
+		}
+		listener = tlsListener
+		log.Printf("TDS Server listening on %s (SSL/TLS enabled)", s.addr)
+	} else {
+		// Create cleartext listener
+		tcpListener, err := net.Listen("tcp", s.addr)
+		if err != nil {
+			return fmt.Errorf("failed to listen: %w", err)
+		}
+		listener = tcpListener
+		log.Printf("TDS Server listening on %s (WARNING: cleartext, no encryption)", s.addr)
+		log.Printf("⚠️  Enable SSL/TLS encryption for production use!")
 	}
 	defer listener.Close()
-
-	log.Printf("TDS Server listening on %s", s.addr)
 
 	for {
 		conn, err := listener.Accept()
@@ -235,8 +252,9 @@ func (s *Server) handlePreLogin(conn net.Conn, packet *tds.Packet) error {
 	log.Printf("Pre-login request: Version=%#v, Encryption=%#02x, Instance=%s",
 		req.Version, req.Encryption, req.Instance)
 
-	// Create pre-login response
-	resp := tds.DefaultPreLoginResponse()
+	// Create pre-login response with encryption level
+	encryptionLevel := tls.GetEncryptionLevel(s.tlsConfig)
+	resp := tds.DefaultPreLoginResponse(encryptionLevel)
 
 	// Serialize response
 	respData := tds.SerializePreLoginResponse(resp)

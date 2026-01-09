@@ -84,8 +84,9 @@ func (am *AuthManager) CreateLogin(name, password, loginType string) (*Login, er
 		return nil, fmt.Errorf("login name cannot be empty")
 	}
 
-	if password == "" {
-		return nil, fmt.Errorf("password cannot be empty")
+	// Allow empty password for sa login only
+	if password == "" && name != "sa" {
+		return nil, fmt.Errorf("password cannot be empty for non-sa login")
 	}
 
 	if loginType == "" {
