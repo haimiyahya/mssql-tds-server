@@ -175,7 +175,7 @@ func findELSEInBody(body string) int {
 
 		if !inQuotes && ifDepth == 0 {
 			// Check for ELSE keyword
-			if strings.ToUpper(body[i:]) == "ELSE" || (i+4 < len(body) && strings.ToUpper(body[i:i+4]) == "ELSE ") {
+			if strings.ToUpper(body[i:]) == "ELSE" || (i+4 < len(body) && strings.ToUpper(body[i:i+4]) == "ELSE") {
 				return i
 			}
 		}
