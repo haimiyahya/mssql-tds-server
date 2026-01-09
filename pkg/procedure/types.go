@@ -36,18 +36,43 @@ func ParseCreateProcedure(sql string) (*Procedure, error) {
 		return nil, fmt.Errorf("not a CREATE PROCEDURE statement")
 	}
 
-	// Extract procedure name and body using regex
-	// Pattern: CREATE PROC[EDURE] proc_name (@params) AS body
-	re := regexp.MustCompile(`CREATE\s+PROC(?:EDURE)?\s+(\w+)\s*\((.*)\)\s+AS\s+(.*)$`)
-	matches := re.FindStringSubmatch(sql)
-
-	if len(matches) != 4 {
-		return nil, fmt.Errorf("invalid CREATE PROCEDURE syntax: %s", sql)
+	// Find AS keyword to separate name+params from body
+	asPos := strings.Index(sql, " AS ")
+	if asPos < 0 {
+		return nil, fmt.Errorf("invalid CREATE PROCEDURE syntax: missing AS keyword")
 	}
 
-	procName := matches[1]
-	paramsStr := strings.TrimSpace(matches[2])
-	bodyStr := strings.TrimSpace(matches[3])
+	beforeAS := strings.TrimSpace(sql[:asPos])
+	bodyStr := strings.TrimSpace(sql[asPos+4:])
+
+	// Parse name and parameters from beforeAS
+	// Format 1: CREATE PROCEDURE name (@params) AS body
+	// Format 2: CREATE PROCEDURE name @param1 type, @param2 type AS body
+	name := ""
+	paramsStr := ""
+
+	parenPos := strings.Index(beforeAS, "(")
+	if parenPos >= 0 {
+		// Format with parentheses
+		name = strings.TrimSpace(beforeAS[:parenPos])
+		// Find closing parenthesis
+		closeParenPos := strings.Index(beforeAS, ")")
+		if closeParenPos >= 0 {
+			paramsStr = strings.TrimSpace(beforeAS[parenPos+1 : closeParenPos])
+		}
+	} else {
+		// Format without parentheses
+		// Name is first word after CREATE PROCEDURE
+		parts := strings.Fields(beforeAS)
+		if len(parts) < 1 {
+			return nil, fmt.Errorf("invalid CREATE PROCEDURE syntax: missing procedure name")
+		}
+		name = parts[1]  // parts[0] is "CREATE", parts[1] is name
+		if len(parts) > 2 {
+			// Everything after name is parameters
+			paramsStr = strings.TrimSpace(strings.Join(parts[2:], " "))
+		}
+	}
 
 	// Parse parameters
 	params, err := parseParameters(paramsStr)
@@ -56,7 +81,7 @@ func ParseCreateProcedure(sql string) (*Procedure, error) {
 	}
 
 	return &Procedure{
-		Name:       procName,
+		Name:       name,
 		Body:       bodyStr,
 		Parameters: params,
 	}, nil

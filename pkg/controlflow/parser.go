@@ -176,6 +176,10 @@ func findELSEInBody(body string) int {
 		if !inQuotes && ifDepth == 0 {
 			// Check for ELSE keyword
 			if strings.ToUpper(body[i:]) == "ELSE" || (i+4 < len(body) && strings.ToUpper(body[i:i+4]) == "ELSE") {
+				// Return position of separator before ELSE (space or beginning)
+				if i > 0 && (body[i-1] == ' ' || body[i-1] == '\t') {
+					return i - 1
+				}
 				return i
 			}
 		}
