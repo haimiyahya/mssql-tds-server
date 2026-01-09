@@ -196,6 +196,49 @@ The MSSQL TDS Server is a high-performance, fully-featured database server that 
   JOIN UserDB2.Orders o ON u.id = o.user_id
   ```
 
+
+**Database Object Storage**
+
+**Catalog Tables** (in `./data/master.db`):
+- `syslogins` - User login storage
+  - Stores login username, password hash (bcrypt)
+  - Authentication type (SQL_SERVER, WINDOWS, MIXED)
+  - Default database and language
+  - Account status (disabled, locked)
+  - Login statistics (count, last login)
+- `sys_databases` - Database catalog
+  - Database metadata (name, ID, state, create_date)
+  - File paths (./data/DatabaseName.db)
+  - System database flags (master, tempdb, model, msdb)
+- `sys_procedures` - Stored procedure catalog
+  - Procedure names and definitions
+  - Database ownership (which database owns this procedure)
+  - Creation dates
+- `sys_functions` - Function catalog
+  - Function names and definitions
+  - Return types
+  - Database ownership (which database owns this function)
+
+**System Tables** (in each database):
+- `sys_objects` - Object catalog
+  - Table, view, index metadata
+  - Object names and types
+  - Creation dates
+- `sys_columns` - Column catalog
+  - Column names and types
+  - Object ownership (which object owns this column)
+  - Nullable flags
+
+**Storage Locations**:
+- User logins: `master.syslogins`
+- Database catalog: `master.sys_databases`
+- Stored procedures: `master.sys_procedures`
+- Functions: `master.sys_functions`
+- Objects (tables, views): `sys_objects` (in each database)
+- Columns: `sys_columns` (in each database)
+
+**Detailed Documentation**: [DATABASE_STORAGE.md](DATABASE_STORAGE.md) - Complete table structures, column details, and storage locations
+
 **Database Storage**
 - Each database = Separate SQLite file
   - Database files stored in `./data/` directory
