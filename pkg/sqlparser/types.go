@@ -35,17 +35,26 @@ func (st StatementType) String() string {
 
 // SelectStatement represents a SELECT statement
 type SelectStatement struct {
-	Columns     []string
-	Table       string
-	WhereClause string
-	Distinct    bool
-	OrderBy     []OrderByClause
+	Columns           []string
+	Table             string
+	WhereClause        string
+	Distinct          bool
+	OrderBy           []OrderByClause
+	Aggregates        []AggregateFunction
+	IsAggregateQuery  bool
 }
 
 // OrderByClause represents an ORDER BY clause
 type OrderByClause struct {
 	Column    string
 	Direction string // "ASC" or "DESC"
+}
+
+// AggregateFunction represents an aggregate function
+type AggregateFunction struct {
+	Type   string // "COUNT", "SUM", "AVG", "MIN", "MAX"
+	Column string
+	Alias  string // Optional AS alias
 }
 
 // InsertStatement represents an INSERT statement

@@ -129,6 +129,15 @@ func (e *Executor) executeSelect(query string) (*ExecuteResult, error) {
 	// 	resultRows = e.removeDuplicates(resultRows)
 	// }
 
+	// Handle aggregate functions
+	// For Phase 11 Iteration 2, we'll let SQLite handle aggregate functions
+	// SQLite supports COUNT, SUM, AVG, MIN, MAX natively
+	// In a more advanced implementation, we would:
+	// if stmt.Select.IsAggregateQuery {
+	// 	resultRows = e.calculateAggregates(resultRows, stmt.Select.Aggregates)
+	// }
+	// For now, SQLite handles all aggregate calculations
+
 	return &ExecuteResult{
 		Columns:  columns,
 		Rows:     resultRows,

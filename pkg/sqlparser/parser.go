@@ -78,6 +78,10 @@ func (p *Parser) parseSelect(query string) *Statement {
 	columnsPart := query[7:fromIndex] // 7 = len("SELECT ")
 	columns := p.parseColumns(columnsPart)
 
+	// Check for aggregate functions in columns
+	aggregates := p.parseAggregates(columnsPart)
+	isAggregateQuery := len(aggregates) > 0
+
 	// Find ORDER BY clause (optional)
 	orderByIndex := strings.Index(upperQuery, " ORDER BY ")
 	var orderByClause []OrderByClause
@@ -112,11 +116,13 @@ func (p *Parser) parseSelect(query string) *Statement {
 	return &Statement{
 		Type: StatementTypeSelect,
 		Select: &SelectStatement{
-			Columns:     columns,
-			Table:       tableName,
-			WhereClause: whereClause,
-			Distinct:    distinct,
-			OrderBy:     orderByClause,
+			Columns:          columns,
+			Table:            tableName,
+			WhereClause:       whereClause,
+			Distinct:         distinct,
+			OrderBy:           orderByClause,
+			Aggregates:       aggregates,
+			IsAggregateQuery:  isAggregateQuery,
 		},
 		RawQuery: query,
 	}
@@ -155,6 +161,56 @@ func (p *Parser) parseOrderBy(orderByClause string) []OrderByClause {
 	}
 
 	return orderByClauses
+}
+
+// parseAggregates parses aggregate functions from column list
+func (p *Parser) parseAggregates(columnsPart string) []AggregateFunction {
+	// Aggregate function patterns: COUNT(*), COUNT(column), SUM(column), AVG(column), MIN(column), MAX(column)
+	re := regexp.MustCompile(`(COUNT|SUM|AVG|MIN|MAX)\(\*?[a-zA-Z0-9_]*\)`)
+
+	matches := re.FindAllString(columnsPart, -1)
+	aggregates := make([]AggregateFunction, 0, len(matches))
+
+	for _, match := range matches {
+		// Extract function type
+		upperMatch := strings.ToUpper(match)
+		var funcType string
+		var column string
+
+		switch {
+		case strings.HasPrefix(upperMatch, "COUNT("):
+			funcType = "COUNT"
+			column = strings.TrimSuffix(strings.TrimPrefix(match, "COUNT("), ")")
+		case strings.HasPrefix(upperMatch, "SUM("):
+			funcType = "SUM"
+			column = strings.TrimSuffix(strings.TrimPrefix(match, "SUM("), ")")
+		case strings.HasPrefix(upperMatch, "AVG("):
+			funcType = "AVG"
+			column = strings.TrimSuffix(strings.TrimPrefix(match, "AVG("), ")")
+		case strings.HasPrefix(upperMatch, "MIN("):
+			funcType = "MIN"
+			column = strings.TrimSuffix(strings.TrimPrefix(match, "MIN("), ")")
+		case strings.HasPrefix(upperMatch, "MAX("):
+			funcType = "MAX"
+			column = strings.TrimSuffix(strings.TrimPrefix(match, "MAX("), ")")
+		}
+
+		// Check for AS alias (e.g., COUNT(*) AS total)
+		alias := ""
+		aliasPattern := regexp.MustCompile(strings.ToUpper(match) + `\s+AS\s+(\w+)`)
+		aliasMatches := aliasPattern.FindStringSubmatch(columnsPart)
+		if len(aliasMatches) > 1 {
+			alias = aliasMatches[1]
+		}
+
+		aggregates = append(aggregates, AggregateFunction{
+			Type:   funcType,
+			Column: column,
+			Alias:  alias,
+		})
+	}
+
+	return aggregates
 }
 
 // parseInsert parses an INSERT statement
