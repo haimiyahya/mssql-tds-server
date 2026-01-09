@@ -3,21 +3,26 @@ package sqlexecutor
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/factory/mssql-tds-server/pkg/sqlparser"
 )
 
 // Executor handles SQL statement execution
 type Executor struct {
-	db    *sql.DB
-	views map[string]string // Store view name -> SELECT query mapping
+	db              *sql.DB
+	views           map[string]string             // Store view name -> SELECT query mapping
+	preparedStmts   map[string]*sql.Stmt         // Store prepared statements
+	preparedSQL     map[string]string             // Store prepared SQL for parameter substitution
 }
 
 // NewExecutor creates a new SQL executor
 func NewExecutor(db *sql.DB) *Executor {
 	return &Executor{
-		db:    db,
-		views: make(map[string]string),
+		db:            db,
+		views:         make(map[string]string),
+		preparedStmts: make(map[string]*sql.Stmt),
+		preparedSQL:   make(map[string]string),
 	}
 }
 
@@ -74,6 +79,15 @@ func (e *Executor) Execute(query string) (*ExecuteResult, error) {
 
 	case sqlparser.StatementTypeDropIndex:
 		return e.executeDropIndex(query)
+
+	case sqlparser.StatementTypePrepare:
+		return e.executePrepare(query)
+
+	case sqlparser.StatementTypeExecute:
+		return e.executeStatement(query)
+
+	case sqlparser.StatementTypeDeallocatePrepare:
+		return e.executeDeallocatePrepare(query)
 
 	case sqlparser.StatementTypeBeginTransaction:
 		return e.executeBeginTransaction(query)
@@ -496,6 +510,136 @@ func (e *Executor) executeRollback(query string) (*ExecuteResult, error) {
 		RowCount: 0,
 		IsQuery:  false,
 		Message:  "Transaction rolled back successfully",
+	}, nil
+}
+
+// executePrepare executes a PREPARE statement
+func (e *Executor) executePrepare(query string) (*ExecuteResult, error) {
+	// Parse query to get PREPARE information
+	stmt, err := sqlparser.NewParser().Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse PREPARE: %w", err)
+	}
+
+	if stmt.Type != sqlparser.StatementTypePrepare || stmt.Prepare == nil {
+		return nil, fmt.Errorf("invalid PREPARE statement")
+	}
+
+	// Prepare the statement using SQLite
+	preparedStmt, err := e.db.Prepare(stmt.Prepare.SQL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare statement: %w", err)
+	}
+
+	// Store the prepared statement
+	e.preparedStmts[stmt.Prepare.Name] = preparedStmt
+	e.preparedSQL[stmt.Prepare.Name] = stmt.Prepare.SQL
+
+	return &ExecuteResult{
+		RowCount: 0,
+		IsQuery:  false,
+		Message:  fmt.Sprintf("Prepared statement '%s' created successfully", stmt.Prepare.Name),
+	}, nil
+}
+
+// executeStatement executes an EXECUTE statement
+func (e *Executor) executeStatement(query string) (*ExecuteResult, error) {
+	// Parse query to get EXECUTE information
+	stmt, err := sqlparser.NewParser().Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse EXECUTE: %w", err)
+	}
+
+	if stmt.Type != sqlparser.StatementTypeExecute || stmt.Execute == nil {
+		return nil, fmt.Errorf("invalid EXECUTE statement")
+	}
+
+	// Check if prepared statement exists
+	_, exists := e.preparedStmts[stmt.Execute.Name]
+	if !exists {
+		return nil, fmt.Errorf("prepared statement '%s' not found", stmt.Execute.Name)
+	}
+
+	// Get the prepared SQL
+	preparedSQL := e.preparedSQL[stmt.Execute.Name]
+
+	// Substitute parameters into SQL
+	execSQL := preparedSQL
+	for paramName, paramValue := range stmt.Execute.Parameters {
+		// Replace @param or $param with actual value
+		placeholder1 := "@" + paramName
+		placeholder2 := "$" + paramName
+
+		valueStr := fmt.Sprintf("%v", paramValue)
+
+		// If it's a string, add quotes
+		if strVal, ok := paramValue.(string); ok && strVal != "" {
+			valueStr = "'" + strVal + "'"
+		}
+
+		execSQL = strings.ReplaceAll(execSQL, placeholder1, valueStr)
+		execSQL = strings.ReplaceAll(execSQL, placeholder2, valueStr)
+	}
+
+	// Determine if it's a query or command
+	upperSQL := strings.ToUpper(execSQL)
+	isQuery := strings.HasPrefix(upperSQL, "SELECT ") ||
+	            strings.HasPrefix(upperSQL, "WITH ") ||
+	            strings.HasPrefix(upperSQL, "EXPLAIN ") ||
+	            strings.HasPrefix(upperSQL, "PRAGMA ")
+
+	if isQuery {
+		// Execute as query
+		return e.executeSelect(execSQL)
+	} else {
+		// Execute as command
+		result, err := e.db.Exec(execSQL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute prepared statement: %w", err)
+		}
+
+		rowsAffected, _ := result.RowsAffected()
+
+		return &ExecuteResult{
+			RowCount: rowsAffected,
+			IsQuery:  false,
+			Message:  fmt.Sprintf("Prepared statement '%s' executed successfully", stmt.Execute.Name),
+		}, nil
+	}
+}
+
+// executeDeallocatePrepare executes a DEALLOCATE PREPARE statement
+func (e *Executor) executeDeallocatePrepare(query string) (*ExecuteResult, error) {
+	// Parse query to get DEALLOCATE PREPARE information
+	stmt, err := sqlparser.NewParser().Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DEALLOCATE PREPARE: %w", err)
+	}
+
+	if stmt.Type != sqlparser.StatementTypeDeallocatePrepare || stmt.DeallocatePrepare == nil {
+		return nil, fmt.Errorf("invalid DEALLOCATE PREPARE statement")
+	}
+
+	// Check if prepared statement exists
+	preparedStmt, exists := e.preparedStmts[stmt.DeallocatePrepare.Name]
+	if !exists {
+		return nil, fmt.Errorf("prepared statement '%s' not found", stmt.DeallocatePrepare.Name)
+	}
+
+	// Close the prepared statement
+	err = preparedStmt.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to close prepared statement: %w", err)
+	}
+
+	// Remove from storage
+	delete(e.preparedStmts, stmt.DeallocatePrepare.Name)
+	delete(e.preparedSQL, stmt.DeallocatePrepare.Name)
+
+	return &ExecuteResult{
+		RowCount: 0,
+		IsQuery:  false,
+		Message:  fmt.Sprintf("Prepared statement '%s' deallocated successfully", stmt.DeallocatePrepare.Name),
 	}, nil
 }
 

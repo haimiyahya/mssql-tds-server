@@ -49,6 +49,12 @@ func (p *Parser) Parse(query string) (*Statement, error) {
 		stmt = p.parseCreateIndex(query)
 	} else if strings.HasPrefix(upperQuery, "DROP INDEX ") {
 		stmt = p.parseDropIndex(query)
+	} else if strings.HasPrefix(upperQuery, "PREPARE ") {
+		stmt = p.parsePrepare(query)
+	} else if strings.HasPrefix(upperQuery, "EXECUTE ") {
+		stmt = p.executeStatement(query)
+	} else if strings.HasPrefix(upperQuery, "DEALLOCATE PREPARE ") {
+		stmt = p.parseDeallocatePrepare(query)
 	} else if strings.HasPrefix(upperQuery, "BEGIN TRANSACTION") || strings.HasPrefix(upperQuery, "BEGIN") || strings.HasPrefix(upperQuery, "START TRANSACTION") {
 		stmt = p.parseBeginTransaction(query)
 	} else if strings.HasPrefix(upperQuery, "COMMIT") || strings.HasPrefix(upperQuery, "COMMIT TRAN") {
@@ -922,6 +928,177 @@ func (p *Parser) parseDropIndex(query string) *Statement {
 		DropIndex: &DropIndexStatement{
 			IndexName: indexName,
 			TableName: tableName,
+		},
+		RawQuery: query,
+	}
+}
+
+// parsePrepare parses a PREPARE statement
+func (p *Parser) parsePrepare(query string) *Statement {
+	// Format: PREPARE statement_name FROM 'sql_statement'
+	// Format: PREPARE statement_name AS sql_statement
+
+	upperQuery := strings.ToUpper(query)
+
+	// Remove "PREPARE "
+	query = strings.TrimPrefix(query, "PREPARE ")
+	upperQuery = strings.TrimPrefix(upperQuery, "PREPARE ")
+
+	// Extract statement name
+	spaceIndex := strings.Index(query, " ")
+	if spaceIndex == -1 {
+		return &Statement{
+			Type:    StatementTypePrepare,
+			RawQuery: query,
+		}
+	}
+
+	statementName := strings.TrimSpace(query[:spaceIndex])
+
+	// Extract SQL statement
+	sqlPart := strings.TrimSpace(query[spaceIndex:])
+	upperSQLPart := strings.ToUpper(sqlPart)
+
+	var sqlStatement string
+	parameters := make([]string, 0)
+
+	if strings.HasPrefix(upperSQLPart, "FROM ") {
+		// Format: PREPARE statement_name FROM 'sql_statement'
+		sqlPart = strings.TrimPrefix(sqlPart, "FROM ")
+		sqlStatement = strings.TrimSpace(sqlPart)
+
+		// Remove quotes if present
+		if (strings.HasPrefix(sqlStatement, "'") && strings.HasSuffix(sqlStatement, "'")) ||
+		   (strings.HasPrefix(sqlStatement, "\"") && strings.HasSuffix(sqlStatement, "\"")) {
+			sqlStatement = strings.Trim(sqlStatement, "'\"")
+		}
+	} else if strings.HasPrefix(upperSQLPart, "AS ") {
+		// Format: PREPARE statement_name AS sql_statement
+		sqlPart = strings.TrimPrefix(sqlPart, "AS ")
+		sqlStatement = strings.TrimSpace(sqlPart)
+	} else {
+		// Assume SQL statement follows directly
+		sqlStatement = sqlPart
+	}
+
+	// Extract parameter placeholders (e.g., $1, $2, @param1, @param2)
+	re := regexp.MustCompile(`[$@]([\w]+)`)
+	matches := re.FindAllStringSubmatch(sqlStatement, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			parameters = append(parameters, match[1])
+		}
+	}
+
+	return &Statement{
+		Type: StatementTypePrepare,
+		Prepare: &PrepareStatement{
+			Name:       statementName,
+			SQL:        sqlStatement,
+			Parameters: parameters,
+		},
+		RawQuery: query,
+	}
+}
+
+// executeStatement parses an EXECUTE statement
+func (p *Parser) executeStatement(query string) *Statement {
+	// Format: EXECUTE statement_name USING @param1 = value1, @param2 = value2
+	// Format: EXECUTE statement_name
+
+	upperQuery := strings.ToUpper(query)
+
+	// Remove "EXECUTE "
+	query = strings.TrimPrefix(query, "EXECUTE ")
+	upperQuery = strings.TrimPrefix(upperQuery, "EXECUTE ")
+
+	// Extract statement name
+	spaceIndex := strings.Index(query, " ")
+	if spaceIndex == -1 {
+		// No USING clause
+		return &Statement{
+			Type: StatementTypeExecute,
+			Execute: &ExecuteStatement{
+				Name:       strings.TrimSpace(query),
+				Parameters: make(map[string]interface{}),
+			},
+			RawQuery: query,
+		}
+	}
+
+	statementName := strings.TrimSpace(query[:spaceIndex])
+
+	// Extract USING clause
+	usingPart := strings.TrimSpace(query[spaceIndex:])
+	upperUsingPart := strings.ToUpper(usingPart)
+
+	if !strings.HasPrefix(upperUsingPart, "USING ") {
+		// Invalid USING clause
+		return &Statement{
+			Type: StatementTypeExecute,
+			Execute: &ExecuteStatement{
+				Name:       statementName,
+				Parameters: make(map[string]interface{}),
+			},
+			RawQuery: query,
+		}
+	}
+
+	usingPart = strings.TrimPrefix(usingPart, "USING ")
+
+	// Parse parameters
+	parameters := make(map[string]interface{})
+	paramPairs := strings.Split(usingPart, ",")
+	for _, pair := range paramPairs {
+		pair = strings.TrimSpace(pair)
+		equalIndex := strings.Index(pair, "=")
+		if equalIndex == -1 {
+			continue
+		}
+
+		paramName := strings.TrimSpace(pair[:equalIndex])
+		paramValue := strings.TrimSpace(pair[equalIndex+1:])
+
+		// Remove @ or $ prefix from parameter name
+		paramName = strings.TrimPrefix(paramName, "@")
+		paramName = strings.TrimPrefix(paramName, "$")
+
+		// Remove quotes from parameter value
+		if (strings.HasPrefix(paramValue, "'") && strings.HasSuffix(paramValue, "'")) ||
+		   (strings.HasPrefix(paramValue, "\"") && strings.HasSuffix(paramValue, "\"")) {
+			paramValue = strings.Trim(paramValue, "'\"")
+		}
+
+		parameters[paramName] = paramValue
+	}
+
+	return &Statement{
+		Type: StatementTypeExecute,
+		Execute: &ExecuteStatement{
+			Name:       statementName,
+			Parameters: parameters,
+		},
+		RawQuery: query,
+	}
+}
+
+// parseDeallocatePrepare parses a DEALLOCATE PREPARE statement
+func (p *Parser) parseDeallocatePrepare(query string) *Statement {
+	// Format: DEALLOCATE PREPARE statement_name
+
+	upperQuery := strings.ToUpper(query)
+
+	// Remove "DEALLOCATE PREPARE "
+	query = strings.TrimPrefix(query, "DEALLOCATE PREPARE ")
+	upperQuery = strings.TrimPrefix(upperQuery, "DEALLOCATE PREPARE ")
+
+	// Extract statement name
+	statementName := strings.TrimSpace(query)
+
+	return &Statement{
+		Type: StatementTypeDeallocatePrepare,
+		DeallocatePrepare: &DeallocatePrepareStatement{
+			Name: statementName,
 		},
 		RawQuery: query,
 	}

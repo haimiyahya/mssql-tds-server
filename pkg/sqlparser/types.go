@@ -20,6 +20,9 @@ const (
 	StatementTypeDropView
 	StatementTypeCreateIndex
 	StatementTypeDropIndex
+	StatementTypePrepare
+	StatementTypeExecute
+	StatementTypeDeallocatePrepare
 	StatementTypeBeginTransaction
 	StatementTypeCommit
 	StatementTypeRollback
@@ -50,6 +53,12 @@ func (st StatementType) String() string {
 		return "CREATE INDEX"
 	case StatementTypeDropIndex:
 		return "DROP INDEX"
+	case StatementTypePrepare:
+		return "PREPARE"
+	case StatementTypeExecute:
+		return "EXECUTE"
+	case StatementTypeDeallocatePrepare:
+		return "DEALLOCATE PREPARE"
 	case StatementTypeBeginTransaction:
 		return "BEGIN TRANSACTION"
 	case StatementTypeCommit:
@@ -168,6 +177,24 @@ type DropIndexStatement struct {
 	TableName string
 }
 
+// PrepareStatement represents a PREPARE statement
+type PrepareStatement struct {
+	Name       string
+	SQL        string
+	Parameters []string
+}
+
+// ExecuteStatement represents an EXECUTE statement
+type ExecuteStatement struct {
+	Name       string
+	Parameters map[string]interface{}
+}
+
+// DeallocatePrepareStatement represents a DEALLOCATE PREPARE statement
+type DeallocatePrepareStatement struct {
+	Name string
+}
+
 // BeginTransactionStatement represents a BEGIN TRANSACTION statement
 type BeginTransactionStatement struct {
 	Name string // Optional transaction name (for named transactions)
@@ -225,6 +252,9 @@ type Statement struct {
 	DropView               *DropViewStatement
 	CreateIndex            *CreateIndexStatement
 	DropIndex              *DropIndexStatement
+	Prepare               *PrepareStatement
+	Execute               *ExecuteStatement
+	DeallocatePrepare     *DeallocatePrepareStatement
 	BeginTransaction       *BeginTransactionStatement
 	Commit                *CommitStatement
 	Rollback              *RollbackStatement
