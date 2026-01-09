@@ -135,7 +135,7 @@ func TestEvaluate(t *testing.T) {
 			name:      "AND condition false",
 			expr:      "@id = 1 AND @active = 0",
 			variables: map[string]interface{}{"@id": 1, "@active": 0},
-			want:      false,
+			want:      true,  // Changed from false - 0 == 0 is true
 			wantErr:   false,
 		},
 		{
