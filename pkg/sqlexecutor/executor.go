@@ -66,6 +66,22 @@ func (e *Executor) Execute(query string) (*ExecuteResult, error) {
 
 // executeSelect executes a SELECT query
 func (e *Executor) executeSelect(query string) (*ExecuteResult, error) {
+	// Parse the query to get ORDER BY and DISTINCT information
+	stmt, err := sqlparser.NewParser().Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse SELECT query: %w", err)
+	}
+
+	// If not a SELECT statement, execute as raw SQL
+	if stmt.Type != sqlparser.StatementTypeSelect || stmt.Select == nil {
+		return e.executeRaw(query)
+	}
+
+	// Remove ORDER BY and DISTINCT from query if present
+	// SQLite supports them natively, but we want to apply them ourselves
+	// For now, let SQLite handle them (simpler approach)
+	// In production, we would implement custom ORDER BY and DISTINCT logic
+
 	rows, err := e.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute SELECT: %w", err)
@@ -100,6 +116,18 @@ func (e *Executor) executeSelect(query string) (*ExecuteResult, error) {
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error after scanning rows: %w", err)
 	}
+
+	// Apply ORDER BY (if parsed and we want to handle it manually)
+	// For Phase 11 Iteration 1, we'll let SQLite handle ORDER BY
+	// In a more advanced implementation, we would:
+	// resultRows = e.sortRows(resultRows, stmt.Select.OrderBy, columns)
+
+	// Apply DISTINCT (if parsed and we want to handle it manually)
+	// For Phase 11 Iteration 1, we'll let SQLite handle DISTINCT
+	// In a more advanced implementation, we would:
+	// if stmt.Select.Distinct {
+	// 	resultRows = e.removeDuplicates(resultRows)
+	// }
 
 	return &ExecuteResult{
 		Columns:  columns,

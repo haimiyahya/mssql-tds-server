@@ -3,8 +3,9 @@
 A Microsoft SQL Server-compatible server implementing the TDS (Tabular Data Stream) protocol with SQLite storage backend.
 
 ## Status
-Proof of Concept - Phase 1, 2, 3, 4, 5, 6, 7, 8 & 9 (ALL PHASES COMPLETE)
-Phase 10 (Plain T-SQL Script Execution) - IN PROGRESS
+Proof of Concept - Phase 1-9 (ALL PHASES COMPLETE)
+Phase 10 (Plain T-SQL Script Execution) - COMPLETE
+Phase 11 (Advanced SELECT Features) - IN PROGRESS
 
 ## Overview
 This project implements a minimal TDS server that can accept connections from standard Go mssql clients and handle basic request/response communication, including stored procedure support.
@@ -15,27 +16,32 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
 ## Project Structure
 ```
 .
-├── PLAN.md          # Detailed project plan
-├── README.md        # This file
-├── go.mod           # Go module definition
-├── pkg/             # Package libraries
-│   ├── sqlite/       # SQLite database management
-│   ├── procedure/    # Stored procedure handling
-│   ├── variable/     # Variable context and parsing
-│   ├── controlflow/  # Control flow (IF/ELSE) parsing and execution
-│   ├── temp/         # Temporary table management
-│   ├── transaction/   # Transaction management
-│   └── tds/          # TDS protocol implementation
-└── cmd/             # Server and client applications
-    ├── server/       # TDS server implementation
-    ├── client/       # Test client using standard mssql driver
-    ├── rpctest/      # RPC procedure test client
-    ├── proctest/      # Procedure test client
-    ├── vartest/       # Variable test client
-    ├── controltest/  # Control flow test client
-    ├── whiletest/    # WHILE loop test client
-    ├── temptest/     # Temporary table test client
-    └── trantest/     # Transaction test client
+├── PLAN.md                          # Detailed project plan
+├── README.md                        # This file
+├── PLAIN_SQL_EXECUTION_PLAN.md       # Phase 10 implementation plan
+├── ADVANCED_SELECT_PLAN.md           # Phase 11 implementation plan
+├── go.mod                           # Go module definition
+├── pkg/                             # Package libraries
+│   ├── sqlite/                       # SQLite database management
+│   ├── procedure/                    # Stored procedure handling
+│   ├── variable/                     # Variable context and parsing
+│   ├── controlflow/                  # Control flow (IF/ELSE) parsing and execution
+│   ├── temp/                         # Temporary table management
+│   ├── transaction/                  # Transaction management
+│   ├── sqlparser/                    # SQL statement parser (Phase 10)
+│   ├── sqlexecutor/                  # SQL statement executor (Phase 10)
+│   └── tds/                         # TDS protocol implementation
+└── cmd/                             # Server and client applications
+    ├── server/                       # TDS server implementation
+    ├── client/                       # Test client using standard mssql driver
+    ├── rpctest/                      # RPC procedure test client
+    ├── proctest/                     # Procedure test client
+    ├── vartest/                      # Variable test client
+    ├── controltest/                  # Control flow test client
+    ├── whiletest/                    # WHILE loop test client
+    ├── temptest/                     # Temporary table test client
+    ├── trantest/                     # Transaction test client
+    └── plainsqltest/                 # Plain SQL test client (Phase 10)
 ```
 
 ## Completed Phases

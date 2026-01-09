@@ -366,16 +366,72 @@ CREATE TABLE test (id INT, name VARCHAR(50))
 DROP TABLE test
 ```
 
-## Future Project Scope (To Be Implemented Separately)
-The following phases will be implemented in a future project that will use this project as a foundation:
+## Future Project Scope (Phases to be implemented progressively)
 
-- **Phase 11**: Advanced SELECT Features
-  - JOIN support
-  - GROUP BY, HAVING
-  - ORDER BY
-  - DISTINCT
-  - Aggregate functions (COUNT, SUM, AVG, etc.)
-  - Subqueries
+- **Phase 11: Advanced SELECT Features** (IN PROGRESS)
+  - JOIN support (INNER, LEFT, RIGHT, FULL)
+  - GROUP BY and HAVING clauses
+  - ORDER BY with ASC/DESC
+  - DISTINCT keyword
+  - Aggregate functions (COUNT, SUM, AVG, MIN, MAX)
+  - Basic subqueries
+
+  **Implementation**: See [ADVANCED_SELECT_PLAN.md](ADVANCED_SELECT_PLAN.md) for detailed implementation strategy.
+
+  **Key Tasks**:
+  11.1 Extend SQL parser for ORDER BY and DISTINCT
+  11.2 Extend SQL parser for aggregate functions
+  11.3 Extend SQL parser for GROUP BY and HAVING
+  11.4 Extend SQL parser for JOIN clauses
+  11.5 Extend SQL parser for basic subqueries
+  11.6 Extend SQL executor for ORDER BY sorting
+  11.7 Extend SQL executor for DISTINCT deduplication
+  11.8 Extend SQL executor for aggregate function calculations
+  11.9 Extend SQL executor for GROUP BY grouping
+  11.10 Extend SQL executor for HAVING filtering
+  11.11 Extend SQL executor for JOIN operations
+  11.12 Extend SQL executor for subquery execution
+  11.13 Create comprehensive test client for advanced features
+  11.14 Create test cases for all advanced features
+  11.15 Test all features and fix any issues
+
+  **Success Criteria**:
+  - ORDER BY sorts correctly (ASC/DESC, multiple columns)
+  - DISTINCT removes duplicate rows
+  - Aggregate functions (COUNT, SUM, AVG, MIN, MAX) work correctly
+  - GROUP BY groups rows correctly and calculates aggregates per group
+  - HAVING filters groups correctly
+  - JOINs (INNER, LEFT, RIGHT) work with ON clauses
+  - Basic subqueries execute correctly
+  - Combined features (ORDER BY + GROUP BY, etc.) work
+
+  **Example usage**:
+  ```sql
+  -- ORDER BY
+  SELECT * FROM products ORDER BY price DESC, name ASC
+
+  -- DISTINCT
+  SELECT DISTINCT department FROM employees
+
+  -- Aggregates
+  SELECT COUNT(*), AVG(salary) FROM employees
+
+  -- GROUP BY
+  SELECT department, AVG(salary) FROM employees GROUP BY department
+
+  -- HAVING
+  SELECT department, COUNT(*) FROM employees GROUP BY department HAVING COUNT(*) > 5
+
+  -- JOINs
+  SELECT * FROM users INNER JOIN orders ON users.id = orders.user_id
+
+  -- Combined
+  SELECT department, AVG(salary)
+  FROM employees
+  GROUP BY department
+  HAVING AVG(salary) > 70000
+  ORDER BY department DESC
+  ```
 
 - **Phase 12**: Exception Handling
   - TRY/CATCH blocks

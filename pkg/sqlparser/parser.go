@@ -52,9 +52,18 @@ func (p *Parser) Parse(query string) (*Statement, error) {
 // parseSelect parses a SELECT statement
 func (p *Parser) parseSelect(query string) *Statement {
 	// Extract columns and table name
-	// Format: SELECT [columns] FROM [table] [WHERE clause]
+	// Format: SELECT [DISTINCT] [columns] FROM [table] [WHERE clause] [ORDER BY clause]
 
 	upperQuery := strings.ToUpper(query)
+
+	// Check for DISTINCT keyword
+	distinct := false
+	if strings.HasPrefix(upperQuery, "SELECT DISTINCT ") {
+		distinct = true
+		query = strings.TrimPrefix(query, "SELECT DISTINCT ")
+		query = "SELECT " + query
+		upperQuery = strings.ToUpper(query)
+	}
 
 	// Find FROM keyword
 	fromIndex := strings.Index(upperQuery, " FROM ")
@@ -69,10 +78,21 @@ func (p *Parser) parseSelect(query string) *Statement {
 	columnsPart := query[7:fromIndex] // 7 = len("SELECT ")
 	columns := p.parseColumns(columnsPart)
 
-	// Find WHERE clause (optional)
-	whereIndex := strings.Index(upperQuery, " WHERE ")
+	// Find ORDER BY clause (optional)
+	orderByIndex := strings.Index(upperQuery, " ORDER BY ")
+	var orderByClause []OrderByClause
 	var whereClause string
 	var tableName string
+
+	// Parse ORDER BY first (comes after WHERE or FROM)
+	if orderByIndex != -1 {
+		orderByClause = p.parseOrderBy(query[orderByIndex+9:]) // 9 = len(" ORDER BY ")
+		query = strings.TrimSpace(query[:orderByIndex])
+		upperQuery = strings.ToUpper(query)
+	}
+
+	// Find WHERE clause (optional)
+	whereIndex := strings.Index(upperQuery, " WHERE ")
 
 	if whereIndex != -1 {
 		// Extract table name (between FROM and WHERE)
@@ -80,7 +100,7 @@ func (p *Parser) parseSelect(query string) *Statement {
 		tableName = strings.TrimSpace(tablePart)
 
 		// Extract WHERE clause
-		whereClause = query[whereIndex+7:] // 7 = len(" WHERE ")
+		whereClause = strings.TrimSpace(query[whereIndex+7:]) // 7 = len(" WHERE ")
 	} else {
 		// No WHERE clause
 		tableName = strings.TrimSpace(query[fromIndex+6:])
@@ -95,9 +115,46 @@ func (p *Parser) parseSelect(query string) *Statement {
 			Columns:     columns,
 			Table:       tableName,
 			WhereClause: whereClause,
+			Distinct:    distinct,
+			OrderBy:     orderByClause,
 		},
 		RawQuery: query,
 	}
+}
+
+// parseOrderBy parses an ORDER BY clause
+func (p *Parser) parseOrderBy(orderByClause string) []OrderByClause {
+	// Remove trailing semicolon if present
+	orderByClause = strings.TrimSpace(strings.TrimSuffix(orderByClause, ";"))
+
+	// Split by comma
+	columnParts := strings.Split(orderByClause, ",")
+	orderByClauses := make([]OrderByClause, 0, len(columnParts))
+
+	for _, part := range columnParts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		// Check for ASC or DESC direction
+		upperPart := strings.ToUpper(part)
+		direction := "ASC" // Default direction
+
+		if strings.HasSuffix(upperPart, " ASC") {
+			part = strings.TrimSpace(part[:len(part)-4])
+		} else if strings.HasSuffix(upperPart, " DESC") {
+			part = strings.TrimSpace(part[:len(part)-5])
+			direction = "DESC"
+		}
+
+		orderByClauses = append(orderByClauses, OrderByClause{
+			Column:    part,
+			Direction: direction,
+		})
+	}
+
+	return orderByClauses
 }
 
 // parseInsert parses an INSERT statement

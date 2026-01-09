@@ -38,6 +38,14 @@ type SelectStatement struct {
 	Columns     []string
 	Table       string
 	WhereClause string
+	Distinct    bool
+	OrderBy     []OrderByClause
+}
+
+// OrderByClause represents an ORDER BY clause
+type OrderByClause struct {
+	Column    string
+	Direction string // "ASC" or "DESC"
 }
 
 // InsertStatement represents an INSERT statement
