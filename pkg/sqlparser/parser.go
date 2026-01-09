@@ -42,6 +42,10 @@ func (p *Parser) Parse(query string) (*Statement, error) {
 		stmt = p.parseCreateView(query)
 	} else if strings.HasPrefix(upperQuery, "DROP VIEW ") {
 		stmt = p.parseDropView(query)
+	} else if strings.HasPrefix(upperQuery, "CREATE INDEX ") || strings.HasPrefix(upperQuery, "CREATE UNIQUE INDEX ") {
+		stmt = p.parseCreateIndex(query)
+	} else if strings.HasPrefix(upperQuery, "DROP INDEX ") {
+		stmt = p.parseDropIndex(query)
 	} else if strings.HasPrefix(upperQuery, "BEGIN TRANSACTION") || strings.HasPrefix(upperQuery, "BEGIN") || strings.HasPrefix(upperQuery, "START TRANSACTION") {
 		stmt = p.parseBeginTransaction(query)
 	} else if strings.HasPrefix(upperQuery, "COMMIT") || strings.HasPrefix(upperQuery, "COMMIT TRAN") {
@@ -708,6 +712,118 @@ func (p *Parser) parseDropView(query string) *Statement {
 		Type: StatementTypeDropView,
 		DropView: &DropViewStatement{
 			ViewName: viewName,
+		},
+		RawQuery: query,
+	}
+}
+
+// parseCreateIndex parses a CREATE INDEX statement
+func (p *Parser) parseCreateIndex(query string) *Statement {
+	// Format: CREATE INDEX index_name ON table_name (col1, col2, ...)
+	// Format: CREATE UNIQUE INDEX index_name ON table_name (col1, col2, ...)
+
+	upperQuery := strings.ToUpper(query)
+
+	// Check for UNIQUE keyword
+	unique := false
+	if strings.HasPrefix(upperQuery, "CREATE UNIQUE INDEX ") {
+		unique = true
+		query = strings.TrimPrefix(query, "CREATE UNIQUE INDEX ")
+		upperQuery = strings.TrimPrefix(upperQuery, "CREATE UNIQUE INDEX ")
+	} else {
+		query = strings.TrimPrefix(query, "CREATE INDEX ")
+		upperQuery = strings.TrimPrefix(upperQuery, "CREATE INDEX ")
+	}
+
+	// Find ON keyword
+	onIndex := strings.Index(upperQuery, " ON ")
+	if onIndex == -1 {
+		return &Statement{
+			Type:    StatementTypeCreateIndex,
+			RawQuery: query,
+		}
+	}
+
+	// Extract index name
+	indexName := strings.TrimSpace(query[:onIndex])
+
+	// Extract table name and columns part
+	tableColumnsPart := strings.TrimSpace(query[onIndex+4:]) // 4 = len(" ON ")
+
+	// Find opening parenthesis
+	openParenIndex := strings.Index(tableColumnsPart, "(")
+	if openParenIndex == -1 {
+		return &Statement{
+			Type:    StatementTypeCreateIndex,
+			RawQuery: query,
+		}
+	}
+
+	// Extract table name
+	tableName := strings.TrimSpace(tableColumnsPart[:openParenIndex])
+
+	// Extract columns part
+	columnsPart := strings.TrimSpace(tableColumnsPart[openParenIndex+1:]) // +1 to skip '('
+
+	// Find closing parenthesis
+	closeParenIndex := strings.Index(columnsPart, ")")
+	if closeParenIndex == -1 {
+		return &Statement{
+			Type:    StatementTypeCreateIndex,
+			RawQuery: query,
+		}
+	}
+
+	// Extract columns
+	columnsStr := strings.TrimSpace(columnsPart[:closeParenIndex])
+	columns := p.parseColumns(columnsStr)
+
+	return &Statement{
+		Type: StatementTypeCreateIndex,
+		CreateIndex: &CreateIndexStatement{
+			IndexName: indexName,
+			TableName: tableName,
+			Columns:   columns,
+			Unique:    unique,
+		},
+		RawQuery: query,
+	}
+}
+
+// parseDropIndex parses a DROP INDEX statement
+func (p *Parser) parseDropIndex(query string) *Statement {
+	// Format: DROP INDEX index_name ON table_name
+
+	upperQuery := strings.ToUpper(query)
+
+	// Remove "DROP INDEX "
+	query = strings.TrimPrefix(query, "DROP INDEX ")
+	upperQuery = strings.TrimPrefix(upperQuery, "DROP INDEX ")
+
+	// Find ON keyword
+	onIndex := strings.Index(upperQuery, " ON ")
+	if onIndex == -1 {
+		// SQLite doesn't require ON clause for DROP INDEX
+		return &Statement{
+			Type: StatementTypeDropIndex,
+			DropIndex: &DropIndexStatement{
+				IndexName: strings.TrimSpace(query),
+			},
+			RawQuery: query,
+		}
+	}
+
+	// Extract index name
+	indexName := strings.TrimSpace(query[:onIndex])
+
+	// Extract table name
+	tableName := strings.TrimSpace(query[onIndex+4:]) // 4 = len(" ON ")
+
+	return &Statement{
+		Type: StatementTypeDropIndex,
+		DropIndex: &DropIndexStatement{
+			IndexName: indexName,
+			TableName: tableName,
 		},
 		RawQuery: query,
 	}

@@ -66,6 +66,12 @@ func (e *Executor) Execute(query string) (*ExecuteResult, error) {
 	case sqlparser.StatementTypeDropView:
 		return e.executeDropView(query)
 
+	case sqlparser.StatementTypeCreateIndex:
+		return e.executeCreateIndex(query)
+
+	case sqlparser.StatementTypeDropIndex:
+		return e.executeDropIndex(query)
+
 	case sqlparser.StatementTypeBeginTransaction:
 		return e.executeBeginTransaction(query)
 
@@ -348,6 +354,61 @@ func (e *Executor) executeDropView(query string) (*ExecuteResult, error) {
 		RowCount: 0,
 		IsQuery:  false,
 		Message:  fmt.Sprintf("View '%s' dropped successfully", stmt.DropView.ViewName),
+	}, nil
+}
+
+// executeCreateIndex executes a CREATE INDEX statement
+func (e *Executor) executeCreateIndex(query string) (*ExecuteResult, error) {
+	// Parse query to get index information
+	stmt, err := sqlparser.NewParser().Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CREATE INDEX: %w", err)
+	}
+
+	if stmt.Type != sqlparser.StatementTypeCreateIndex || stmt.CreateIndex == nil {
+		return nil, fmt.Errorf("invalid CREATE INDEX statement")
+	}
+
+	// Execute CREATE INDEX on SQLite (SQLite supports CREATE INDEX natively)
+	_, err = e.db.Exec(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create index in SQLite: %w", err)
+	}
+
+	uniqueFlag := ""
+	if stmt.CreateIndex.Unique {
+		uniqueFlag = "UNIQUE "
+	}
+
+	return &ExecuteResult{
+		RowCount: 0,
+		IsQuery:  false,
+		Message:  fmt.Sprintf("%sIndex '%s' created successfully on table '%s'", uniqueFlag, stmt.CreateIndex.IndexName, stmt.CreateIndex.TableName),
+	}, nil
+}
+
+// executeDropIndex executes a DROP INDEX statement
+func (e *Executor) executeDropIndex(query string) (*ExecuteResult, error) {
+	// Parse query to get index name
+	stmt, err := sqlparser.NewParser().Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DROP INDEX: %w", err)
+	}
+
+	if stmt.Type != sqlparser.StatementTypeDropIndex || stmt.DropIndex == nil {
+		return nil, fmt.Errorf("invalid DROP INDEX statement")
+	}
+
+	// Execute DROP INDEX on SQLite (SQLite supports DROP INDEX natively)
+	_, err = e.db.Exec(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to drop index in SQLite: %w", err)
+	}
+
+	return &ExecuteResult{
+		RowCount: 0,
+		IsQuery:  false,
+		Message:  fmt.Sprintf("Index '%s' dropped successfully", stmt.DropIndex.IndexName),
 	}, nil
 }
 

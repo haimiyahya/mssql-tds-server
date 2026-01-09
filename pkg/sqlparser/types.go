@@ -13,6 +13,8 @@ const (
 	StatementTypeDropTable
 	StatementTypeCreateView
 	StatementTypeDropView
+	StatementTypeCreateIndex
+	StatementTypeDropIndex
 	StatementTypeBeginTransaction
 	StatementTypeCommit
 	StatementTypeRollback
@@ -37,6 +39,10 @@ func (st StatementType) String() string {
 		return "CREATE VIEW"
 	case StatementTypeDropView:
 		return "DROP VIEW"
+	case StatementTypeCreateIndex:
+		return "CREATE INDEX"
+	case StatementTypeDropIndex:
+		return "DROP INDEX"
 	case StatementTypeBeginTransaction:
 		return "BEGIN TRANSACTION"
 	case StatementTypeCommit:
@@ -131,6 +137,20 @@ type DropViewStatement struct {
 	ViewName string
 }
 
+// CreateIndexStatement represents a CREATE INDEX statement
+type CreateIndexStatement struct {
+	IndexName string
+	TableName string
+	Columns   []string
+	Unique    bool
+}
+
+// DropIndexStatement represents a DROP INDEX statement
+type DropIndexStatement struct {
+	IndexName string
+	TableName string
+}
+
 // BeginTransactionStatement represents a BEGIN TRANSACTION statement
 type BeginTransactionStatement struct {
 	Name string // Optional transaction name (for named transactions)
@@ -165,6 +185,8 @@ type Statement struct {
 	DropTable              *DropTableStatement
 	CreateView             *CreateViewStatement
 	DropView               *DropViewStatement
+	CreateIndex            *CreateIndexStatement
+	DropIndex              *DropIndexStatement
 	BeginTransaction       *BeginTransactionStatement
 	Commit                *CommitStatement
 	Rollback              *RollbackStatement
