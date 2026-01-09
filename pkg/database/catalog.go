@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/factory/mssql-tds-server/pkg/trash"
 )
 
 // Database represents a database
@@ -249,7 +251,7 @@ func (c *Catalog) CreateDatabase(dbName string) (*Database, error) {
 	return database, nil
 }
 
-// DropDatabase drops a database
+// DropDatabase drops a database and moves file to trash/recycle bin
 func (c *Catalog) DropDatabase(dbName string) error {
 	// Check if system database
 	if isSystemDatabase(dbName) {
@@ -266,10 +268,10 @@ func (c *Catalog) DropDatabase(dbName string) error {
 		return fmt.Errorf("database '%s' not found", dbName)
 	}
 
-	// Delete database file
-	err = os.Remove(dbPath)
+	// Move database file to trash/recycle bin instead of deleting
+	err = trash.MoveToTrash(dbPath)
 	if err != nil {
-		return fmt.Errorf("error deleting database file: %w", err)
+		return fmt.Errorf("error moving database to trash: %w", err)
 	}
 
 	// Remove from catalog

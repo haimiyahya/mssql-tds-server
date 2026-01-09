@@ -42,7 +42,7 @@ func (e *Executor) ExecuteDropDatabase(stmt *sqlparser.DropDatabaseStatement) er
 		return fmt.Errorf("cannot drop database '%s' because it is currently in use", stmt.DatabaseName)
 	}
 
-	// Drop database using catalog
+	// Drop database using catalog (moves file to trash)
 	err := e.catalog.DropDatabase(stmt.DatabaseName)
 	if err != nil {
 		return fmt.Errorf("error dropping database '%s': %w", stmt.DatabaseName, err)
@@ -54,7 +54,7 @@ func (e *Executor) ExecuteDropDatabase(stmt *sqlparser.DropDatabaseStatement) er
 		delete(e.connections, stmt.DatabaseName)
 	}
 
-	log.Printf("Dropped database: %s", stmt.DatabaseName)
+	log.Printf("Dropped database: %s (moved to recycle bin/trash)", stmt.DatabaseName)
 
 	return nil
 }
