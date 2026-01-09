@@ -3,7 +3,7 @@
 A Microsoft SQL Server-compatible server implementing the TDS (Tabular Data Stream) protocol with SQLite storage backend.
 
 ## Status
-Proof of Concept - Phase 1, 2, 3, 4, 5, 6 & 7
+Proof of Concept - Phase 1, 2, 3, 4, 5, 6, 7 & 8
 
 ## Overview
 This project implements a minimal TDS server that can accept connections from standard Go mssql clients and handle basic request/response communication, including stored procedure support.
@@ -22,6 +22,7 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
 │   ├── procedure/    # Stored procedure handling
 │   ├── variable/     # Variable context and parsing
 │   ├── controlflow/  # Control flow (IF/ELSE) parsing and execution
+│   ├── temp/         # Temporary table management
 │   └── tds/          # TDS protocol implementation
 └── cmd/             # Server and client applications
     ├── server/       # TDS server implementation
@@ -30,7 +31,8 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
     ├── proctest/      # Procedure test client
     ├── vartest/       # Variable test client
     ├── controltest/  # Control flow test client
-    └── whiletest/    # WHILE loop test client
+    ├── whiletest/    # WHILE loop test client
+    └── temptest/     # Temporary table test client
 ```
 
 ## Completed Phases
@@ -95,6 +97,16 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
 - Support for BREAK/CONTINUE (basic)
 - Error handling for infinite loops
 
+### Phase 8: Temporary Tables (#temp) ✅
+- CREATE TABLE #temp statement parsing
+- Temporary table creation and in-memory storage
+- INSERT INTO #temp operations
+- SELECT FROM #temp operations
+- Session management for temp tables
+- Automatic cleanup on session end
+- Temp table name resolution (#temp → internal)
+- Basic UPDATE and DELETE support
+
 **Example Usage:**
 ```sql
 -- Simple procedure (Phase 4)
@@ -128,6 +140,15 @@ CREATE PROCEDURE CountToTen AS
         SELECT @i as number
         SET @i = @i + 1
 
+-- Procedure with temporary tables (Phase 8)
+CREATE PROCEDURE ProcessResults AS
+    CREATE TABLE #results (id INT, name VARCHAR(50))
+
+    INSERT INTO #results VALUES (1, 'Alice')
+    INSERT INTO #results VALUES (2, 'Bob')
+
+    SELECT * FROM #results
+
 -- Execute procedure
 EXEC GetUserById @id=1
 
@@ -142,7 +163,6 @@ See [PLAN.md](PLAN.md) for implementation phases and tasks.
 This project provides the foundation for a full-featured MSSQL-compatible server. Future phases will be implemented progressively:
 
 
-- **Phase 8**: Temporary Tables (#temp)
 - **Phase 9**: Transaction Management (BEGIN TRAN, COMMIT, ROLLBACK)
 
 See [PLAN.md](PLAN.md) for complete roadmap.
