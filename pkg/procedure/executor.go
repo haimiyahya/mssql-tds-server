@@ -9,22 +9,25 @@ import (
 	"github.com/factory/mssql-tds-server/pkg/controlflow"
 	"github.com/factory/mssql-tds-server/pkg/sqlite"
 	"github.com/factory/mssql-tds-server/pkg/temp"
+	"github.com/factory/mssql-tds-server/pkg/transaction"
 	"github.com/factory/mssql-tds-server/pkg/variable"
 )
 
 // Executor handles stored procedure execution
 type Executor struct {
-	db              *sql.DB
-	storage         *Storage
-	tempTableMgr    *temp.Manager
+	db               *sql.DB
+	storage          *Storage
+	tempTableMgr     *temp.Manager
+	transactionCtx   *transaction.Context
 }
 
 // NewExecutor creates a new procedure executor
 func NewExecutor(db *sqlite.Database, storage *Storage) (*Executor, error) {
 	return &Executor{
-		db:           db.GetDB(),
-		storage:      storage,
-		tempTableMgr: temp.NewManager(),
+		db:              db.GetDB(),
+		storage:         storage,
+		tempTableMgr:    temp.NewManager(),
+		transactionCtx:  transaction.NewContext(),
 	}, nil
 }
 
@@ -36,13 +39,14 @@ func (e *Executor) Execute(name string, paramValues map[string]interface{}) ([][
 		return nil, err
 	}
 
-	// Check if procedure uses variables, control flow, or temp tables (has DECLARE, SET, IF, #temp, etc.)
+	// Check if procedure uses variables, control flow, temp tables, or transactions
 	bodyUpper := strings.ToUpper(proc.Body)
 	usesVariables := strings.Contains(bodyUpper, "DECLARE") ||
 		strings.Contains(bodyUpper, "SET ") ||
 		regexp.MustCompile(`SELECT\s+@\w+\s*=`).MatchString(bodyUpper) ||
 		strings.Contains(bodyUpper, "IF ") ||
-		temp.IsTempTable(bodyUpper) // Check for #temp tables
+		temp.IsTempTable(bodyUpper) || // Check for #temp tables
+		transaction.DetectTransactionUsage(proc.Body) // Check for transactions
 
 	if usesVariables {
 		return e.ExecuteWithVariables(name, paramValues)
@@ -107,6 +111,11 @@ func (e *Executor) ExecuteWithVariables(name string, paramValues map[string]inte
 	sessionID := e.tempTableMgr.CreateSession()
 	defer e.tempTableMgr.DropSession(sessionID)
 
+	// Create transaction context for this execution
+	// Note: We create a fresh context per execution to avoid state leakage
+	// However, the actual transaction is managed by BEGIN TRAN statements in the SQL
+	txCtx := transaction.NewContext()
+
 	// Parse procedure body into statements
 	statements, err := controlflow.SplitStatements(proc.Body)
 	if err != nil {
@@ -117,8 +126,12 @@ func (e *Executor) ExecuteWithVariables(name string, paramValues map[string]inte
 	var results [][]string
 
 	for _, stmt := range statements {
-		result, err := e.executeStatement(stmt, paramValues, ctx, sessionID)
+		result, err := e.executeStatement(stmt, paramValues, ctx, sessionID, txCtx)
 		if err != nil {
+			// Rollback any active transactions on error
+			if txCtx.IsActive() {
+				_ = txCtx.RollbackAll()
+			}
 			return nil, fmt.Errorf("failed to execute statement: %w", err)
 		}
 
@@ -139,13 +152,18 @@ func (e *Executor) ExecuteWithVariables(name string, paramValues map[string]inte
 }
 
 // executeStatement executes a single statement with variable context
-func (e *Executor) executeStatement(stmt string, paramValues map[string]interface{}, ctx *variable.Context, sessionID string) ([][]string, error) {
+func (e *Executor) executeStatement(stmt string, paramValues map[string]interface{}, ctx *variable.Context, sessionID string, txCtx *transaction.Context) ([][]string, error) {
 	// Determine statement type
 	stmtType := controlflow.ParseStatement(stmt)
 
 	// Check for CREATE TABLE #temp (temporary table)
 	if strings.HasPrefix(strings.ToUpper(stmt), "CREATE TABLE") && temp.IsTempTable(stmt) {
 		return e.executeCreateTempTable(stmt, sessionID)
+	}
+
+	// Check for transaction statements
+	if transaction.IsTransactionStatement(stmt) {
+		return e.executeTransaction(stmt, txCtx)
 	}
 
 	switch stmtType {
@@ -159,13 +177,13 @@ func (e *Executor) executeStatement(stmt string, paramValues map[string]interfac
 		return e.executeSelectAssignment(stmt, ctx)
 
 	case controlflow.StatementIF:
-		return e.executeIF(stmt, paramValues, ctx, sessionID)
+		return e.executeIF(stmt, paramValues, ctx, sessionID, txCtx)
 
 	case controlflow.StatementWHILE:
-		return e.executeWHILE(stmt, paramValues, ctx, sessionID)
+		return e.executeWHILE(stmt, paramValues, ctx, sessionID, txCtx)
 
 	case controlflow.StatementQuery:
-		return e.executeQuery(stmt, paramValues, ctx, sessionID)
+		return e.executeQuery(stmt, paramValues, ctx, sessionID, txCtx)
 
 	default:
 		return nil, fmt.Errorf("unknown statement type")
@@ -341,6 +359,42 @@ func (e *Executor) parseValue(valueStr string) interface{} {
 	return i
 }
 
+// executeTransaction handles BEGIN TRAN, COMMIT, ROLLBACK statements
+func (e *Executor) executeTransaction(stmt string, txCtx *transaction.Context) ([][]string, error) {
+	// Parse transaction type
+	txType := transaction.ParseStatement(stmt)
+
+	switch txType {
+	case transaction.TransactionBegin:
+		// BEGIN TRANSACTION
+		tx, err := txCtx.Begin(e.db)
+		if err != nil {
+			return nil, err
+		}
+		_ = tx // tx is stored in context
+		return nil, nil
+
+	case transaction.TransactionCommit:
+		// COMMIT
+		err := txCtx.Commit()
+		if err != nil {
+			return nil, err
+		}
+		return nil, nil
+
+	case transaction.TransactionRollback:
+		// ROLLBACK
+		err := txCtx.Rollback()
+		if err != nil {
+			return nil, err
+		}
+		return nil, nil
+
+	default:
+		return nil, fmt.Errorf("unknown transaction statement type")
+	}
+}
+
 // executeDeclare handles DECLARE statements
 func (e *Executor) executeDeclare(stmt string, ctx *variable.Context) ([][]string, error) {
 	// Parse declaration
@@ -421,7 +475,7 @@ func (e *Executor) executeSelectAssignment(stmt string, ctx *variable.Context) (
 }
 
 // executeQuery handles regular SELECT queries
-func (e *Executor) executeQuery(sql string, paramValues map[string]interface{}, ctx *variable.Context, sessionID string) ([][]string, error) {
+func (e *Executor) executeQuery(sql string, paramValues map[string]interface{}, ctx *variable.Context, sessionID string, txCtx *transaction.Context) ([][]string, error) {
 	// Replace procedure parameters first
 	sql, err := e.replaceParameters(sql, paramValues)
 	if err != nil {
@@ -456,8 +510,17 @@ func (e *Executor) executeQuery(sql string, paramValues map[string]interface{}, 
 		sql = temp.ReplaceTempTableNames(sql, sessionID)
 	}
 
-	// Execute SQL
-	rows, err := e.db.Query(sql)
+	// Execute SQL (use active transaction if available)
+	var rows *sql.Rows
+	var err error
+
+	if txCtx.IsActive() {
+		tx := txCtx.GetCurrentTx()
+		rows, err = tx.Query(sql)
+	} else {
+		rows, err = e.db.Query(sql)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -597,7 +660,7 @@ func (e *Executor) readResults(rows *sql.Rows) ([][]string, error) {
 }
 
 // executeWHILE handles WHILE loops
-func (e *Executor) executeWHILE(stmt string, paramValues map[string]interface{}, ctx *variable.Context) ([][]string, error) {
+func (e *Executor) executeWHILE(stmt string, paramValues map[string]interface{}, ctx *variable.Context, sessionID string, txCtx *transaction.Context) ([][]string, error) {
 	// Parse WHILE block
 	block, err := controlflow.ParseWHILEBlock(stmt)
 	if err != nil {
@@ -627,7 +690,7 @@ func (e *Executor) executeWHILE(stmt string, paramValues map[string]interface{},
 		}
 
 		// Execute WHILE body
-		bodyResults, err := e.executeBlock(block.Body[0], paramValues, ctx, sessionID)
+		bodyResults, err := e.executeBlock(block.Body[0], paramValues, ctx, sessionID, txCtx)
 		if err != nil {
 			return nil, err
 		}
@@ -649,7 +712,7 @@ func (e *Executor) executeWHILE(stmt string, paramValues map[string]interface{},
 }
 
 // executeIF handles IF statements
-func (e *Executor) executeIF(stmt string, paramValues map[string]interface{}, ctx *variable.Context) ([][]string, error) {
+func (e *Executor) executeIF(stmt string, paramValues map[string]interface{}, ctx *variable.Context, sessionID string, txCtx *transaction.Context) ([][]string, error) {
 	// Parse IF block
 	block, elseInfo, err := controlflow.ParseIFBlock(stmt)
 	if err != nil {
@@ -668,12 +731,12 @@ func (e *Executor) executeIF(stmt string, paramValues map[string]interface{}, ct
 	// Execute appropriate block
 	if conditionResult {
 		// Execute IF body
-		return e.executeBlock(block.Body[0], paramValues, ctx, sessionID)
+		return e.executeBlock(block.Body[0], paramValues, ctx, sessionID, txCtx)
 	}
 
 	// Execute ELSE if present
 	if elseInfo != nil && len(elseInfo) > 1 {
-		return e.executeBlock(elseInfo[1], paramValues, ctx, sessionID)
+		return e.executeBlock(elseInfo[1], paramValues, ctx, sessionID, txCtx)
 	}
 
 	// No result set for IF (if no SELECT in body)
@@ -681,7 +744,7 @@ func (e *Executor) executeIF(stmt string, paramValues map[string]interface{}, ct
 }
 
 // executeBlock executes a block of SQL (IF body or ELSE body)
-func (e *Executor) executeBlock(block string, paramValues map[string]interface{}, ctx *variable.Context, sessionID string) ([][]string, error) {
+func (e *Executor) executeBlock(block string, paramValues map[string]interface{}, ctx *variable.Context, sessionID string, txCtx *transaction.Context) ([][]string, error) {
 	// Split block into statements
 	statements, err := controlflow.SplitStatements(block)
 	if err != nil {
@@ -692,7 +755,7 @@ func (e *Executor) executeBlock(block string, paramValues map[string]interface{}
 	var results [][]string
 
 	for _, stmt := range statements {
-		result, err := e.executeStatement(stmt, paramValues, ctx, sessionID)
+		result, err := e.executeStatement(stmt, paramValues, ctx, sessionID, txCtx)
 		if err != nil {
 			return nil, err
 		}
