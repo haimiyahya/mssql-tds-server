@@ -2,7 +2,6 @@ package controlflow
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 )
 
@@ -398,7 +397,6 @@ func ParseIFStatement(sql string) (*Block, []string, error) {
 	elsePos := findELSEKeyword(bodyStr)
 
 	var ifBlock *Block
-	var elseBlock *Block
 
 	if elsePos >= 0 {
 		// Split into IF and ELSE blocks
@@ -409,12 +407,6 @@ func ParseIFStatement(sql string) (*Block, []string, error) {
 			Type:     BlockIf,
 			Condition: condition,
 			Body:     []string{ifBody},
-		}
-
-		elseBlock = &Block{
-			Type:     BlockElse,
-			Condition: nil,
-			Body:     []string{elseBody},
 		}
 
 		// Return both blocks

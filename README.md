@@ -4,6 +4,7 @@ A Microsoft SQL Server-compatible server implementing the TDS (Tabular Data Stre
 
 ## Status
 Proof of Concept - Phase 1, 2, 3, 4, 5, 6, 7, 8 & 9 (ALL PHASES COMPLETE)
+Phase 10 (Plain T-SQL Script Execution) - IN PROGRESS
 
 ## Overview
 This project implements a minimal TDS server that can accept connections from standard Go mssql clients and handle basic request/response communication, including stored procedure support.
@@ -183,10 +184,9 @@ See [PLAN.md](PLAN.md) for implementation phases and tasks.
 ## Future Work
 This project provides the foundation for a full-featured MSSQL-compatible server. Future phases will be implemented progressively:
 
+**All planned phases (1-9) are now complete!**
 
-**All planned phases are now complete!**
-
-The server now supports:
+The server currently supports:
 - TDS protocol communication
 - Stored procedures with parameters
 - Variables (DECLARE, SET, SELECT @var)
@@ -194,4 +194,15 @@ The server now supports:
 - Temporary tables (#temp)
 - Transactions (BEGIN TRAN, COMMIT, ROLLBACK)
 
-See [PLAN.md](PLAN.md) for complete roadmap.
+**Phase 10 - Plain T-SQL Script Execution (In Progress)**
+
+Adding support for executing plain T-SQL scripts directly without wrapping them in stored procedures. This includes:
+- Direct SELECT queries
+- INSERT, UPDATE, DELETE statements
+- CREATE TABLE, DROP TABLE statements
+- Proper result set formatting
+- Error handling for SQL execution
+
+See [PLAIN_SQL_EXECUTION_PLAN.md](PLAIN_SQL_EXECUTION_PLAN.md) for detailed implementation plan.
+
+See [PLAN.md](PLAN.md) for complete roadmap including future phases.

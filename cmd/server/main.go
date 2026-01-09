@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/factory/mssql-tds-server/pkg/procedure"
+	"github.com/factory/mssql-tds-server/pkg/sqlexecutor"
 	"github.com/factory/mssql-tds-server/pkg/sqlite"
 	"github.com/factory/mssql-tds-server/pkg/tds"
 )
@@ -22,6 +23,7 @@ type Server struct {
 	procedureExecutor     *procedure.Executor
 	queryProcessor       *tds.QueryProcessor
 	storedProcedureHandler *tds.StoredProcedureHandler
+	sqlExecutor          *sqlexecutor.Executor
 }
 
 func NewServer(port int, dbPath string) (*Server, error) {
@@ -49,13 +51,21 @@ func NewServer(port int, dbPath string) (*Server, error) {
 		return nil, fmt.Errorf("failed to create procedure executor: %w", err)
 	}
 
+	// Create SQL executor for plain SQL execution
+	sqlExec := sqlexecutor.NewExecutor(db.GetDB())
+
+	// Create query processor and set SQL executor
+	queryProc := tds.NewQueryProcessor()
+	queryProc.SetExecutor(sqlExec)
+
 	return &Server{
 		addr:                 fmt.Sprintf(":%d", port),
 		db:                   db,
 		procedureStorage:      procStorage,
 		procedureExecutor:     procExecutor,
-		queryProcessor:       tds.NewQueryProcessor(),
+		queryProcessor:       queryProc,
 		storedProcedureHandler: tds.NewStoredProcedureHandler(),
+		sqlExecutor:          sqlExec,
 	}, nil
 }
 

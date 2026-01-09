@@ -96,7 +96,6 @@ func ParseIFBlock(sql string) (*Block, []string, error) {
 	elsePos := findELSEInBody(bodyStr)
 
 	var ifBlock *Block
-	var elseBlock *Block
 
 	if elsePos >= 0 {
 		// Split into IF and ELSE blocks
@@ -107,12 +106,6 @@ func ParseIFBlock(sql string) (*Block, []string, error) {
 			Type:     BlockIf,
 			Condition: condition,
 			Body:     []string{ifBody},
-		}
-
-		elseBlock = &Block{
-			Type:     BlockElse,
-			Condition: nil,
-			Body:     []string{elseBody},
 		}
 
 		// Return both blocks

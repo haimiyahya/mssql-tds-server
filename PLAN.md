@@ -301,29 +301,102 @@ AS
             ROLLBACK TRAN
 ```
 
+### Phase 10: Plain T-SQL Script Execution
+**Goal**: Add support for executing plain T-SQL scripts directly without wrapping them in stored procedures
+
+**Rationale**: This is a fundamental MSSQL Server usage pattern that's currently missing. Users expect to run SELECT, INSERT, UPDATE, DELETE, and DDL statements directly.
+
+**Implementation**: See [PLAIN_SQL_EXECUTION_PLAN.md](PLAIN_SQL_EXECUTION_PLAN.md) for detailed implementation strategy.
+
+**Key Tasks**:
+10.1 Create SQL statement parser (`pkg/sqlparser`)
+   - Parse SELECT, INSERT, UPDATE, DELETE statements
+   - Parse CREATE TABLE, DROP TABLE statements
+   - Extract table names, column names, WHERE clauses
+   - Handle statement termination
+
+10.2 Create SQL statement executor (`pkg/sqlexecutor`)
+   - Execute SELECT queries and return result sets
+   - Execute INSERT/UPDATE/DELETE and return affected row count
+   - Execute DDL statements (CREATE, DROP)
+   - Handle errors properly
+
+10.3 Update QueryProcessor
+   - Replace simple echo functionality with real SQL execution
+   - Integrate parser and executor
+   - Return properly formatted TDS result sets
+
+10.4 Improve result set formatting
+   - Convert SQLite types to TDS types
+   - Format COLMETADATA tokens
+   - Format ROW tokens
+   - Format DONE tokens
+   - Handle NULL values
+
+10.5 Enhance error handling
+   - Parse SQLite errors
+   - Convert to TDS ERROR tokens
+   - Format error messages in MSSQL-compatible format
+
+10.6 Create comprehensive test suite
+   - Test SELECT, INSERT, UPDATE, DELETE
+   - Test CREATE TABLE, DROP TABLE
+   - Test error handling
+   - Test various data types
+
+**Success Criteria**:
+- SELECT queries work and return proper result sets
+- INSERT/UPDATE/DELETE statements work and return affected row count
+- CREATE/DROP TABLE statements work
+- Errors are properly formatted
+- All data types handled correctly
+
+**Example usage**:
+```sql
+-- Direct table queries
+SELECT * FROM users WHERE id = 1
+
+-- Data modifications
+INSERT INTO users (name, email) VALUES ('John', 'john@example.com')
+UPDATE users SET name = 'Jane' WHERE id = 1
+DELETE FROM users WHERE id = 1
+
+-- DDL operations
+CREATE TABLE test (id INT, name VARCHAR(50))
+DROP TABLE test
+```
+
 ## Future Project Scope (To Be Implemented Separately)
 The following phases will be implemented in a future project that will use this project as a foundation:
 
-- **Phase 10**: Exception Handling
+- **Phase 11**: Advanced SELECT Features
+  - JOIN support
+  - GROUP BY, HAVING
+  - ORDER BY
+  - DISTINCT
+  - Aggregate functions (COUNT, SUM, AVG, etc.)
+  - Subqueries
+
+- **Phase 12**: Exception Handling
   - TRY/CATCH blocks
   - RAISERROR
   - Custom error messages
 
-- **Phase 11**: Cursor Support
+- **Phase 13**: Cursor Support
   - DECLARE CURSOR
   - FETCH operations
   - CLOSE/DEALLOCATE
 
-- **Phase 12**: Dynamic SQL
+- **Phase 14**: Dynamic SQL
   - EXEC('...') statements
   - sp_executesql
 
-- **Phase 13**: TDS Feature Expansion
+- **Phase 15**: TDS Feature Expansion
   - Implement TDS login authentication
   - Support for multiple result sets
   - Proper error code handling
 
-- **Phase 14**: Production Readiness
+- **Phase 16**: Production Readiness
   - Connection pooling
   - Concurrent request handling
   - Performance optimization
