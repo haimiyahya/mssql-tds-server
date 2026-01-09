@@ -145,6 +145,10 @@ func findOutermostEND(sql string) int {
 		if !inQuotes && depth == 0 {
 			// Check for END keyword
 			if strings.ToUpper(sql[i:]) == "END" || (i+3 < len(sql) && strings.ToUpper(sql[i:i+3]) == "END ") {
+				// Return position of separator before END (space or beginning)
+				if i > 0 && (sql[i-1] == ' ' || sql[i-1] == '\t') {
+					return i - 1
+				}
 				return i
 			}
 		}
