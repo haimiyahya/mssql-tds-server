@@ -1000,7 +1000,6 @@ For questions, issues, or contributions, please contact:
 - **Author**: Haimiyahya
 - **GitHub**: https://github.com/haimiyahya/mssql-tds-server
 - **Issues**: https://github.com/haimiyahya/mssql-tds-server/issues
-- **Email**: [your-email@example.com]
 
 ---
 
