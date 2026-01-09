@@ -131,15 +131,16 @@ func (c *Context) GetAll() map[string]*Variable {
 func ParseDeclaration(sql string) (*Variable, error) {
 	// Normalize SQL
 	sql = strings.TrimSpace(sql)
-	sql = strings.ToUpper(sql)
 
-	// Check if it starts with DECLARE
-	if !strings.HasPrefix(sql, "DECLARE") {
+	// Check if it starts with DECLARE (case-insensitive)
+	if !strings.HasPrefix(strings.ToUpper(sql), "DECLARE") {
 		return nil, fmt.Errorf("not a DECLARE statement")
 	}
 
-	// Remove DECLARE keyword
-	sql = strings.TrimSpace(sql[7:])
+	// Remove DECLARE keyword (case-insensitive)
+	upperSql := strings.ToUpper(sql)
+	declareIndex := strings.Index(upperSql, "DECLARE")
+	sql = strings.TrimSpace(sql[declareIndex+7:])
 
 	// Parse variable name and type
 	// Format: @var TYPE [LENGTH]
@@ -150,8 +151,8 @@ func ParseDeclaration(sql string) (*Variable, error) {
 		return nil, fmt.Errorf("invalid DECLARE syntax: %s", sql)
 	}
 
-	name := matches[1]
-	varType := Type(matches[2])
+	name := strings.ToLower(matches[1])
+	varType := Type(strings.ToUpper(matches[2]))
 
 	// Parse length and precision
 	length := 0
@@ -185,15 +186,16 @@ func ParseDeclaration(sql string) (*Variable, error) {
 func ParseSetAssignment(sql string) (string, interface{}, error) {
 	// Normalize SQL
 	sql = strings.TrimSpace(sql)
-	sql = strings.ToUpper(sql)
 
-	// Check if it starts with SET
-	if !strings.HasPrefix(sql, "SET") {
+	// Check if it starts with SET (case-insensitive)
+	if !strings.HasPrefix(strings.ToUpper(sql), "SET") {
 		return "", nil, fmt.Errorf("not a SET statement")
 	}
 
-	// Remove SET keyword
-	sql = strings.TrimSpace(sql[3:])
+	// Remove SET keyword (case-insensitive)
+	upperSql := strings.ToUpper(sql)
+	setIndex := strings.Index(upperSql, "SET")
+	sql = strings.TrimSpace(sql[setIndex+3:])
 
 	// Parse variable name and value
 	// Format: @var = value
@@ -204,7 +206,7 @@ func ParseSetAssignment(sql string) (string, interface{}, error) {
 		return "", nil, fmt.Errorf("invalid SET syntax: %s", sql)
 	}
 
-	varName := matches[1]
+	varName := strings.ToLower(matches[1])
 	valueStr := strings.TrimSpace(matches[2])
 
 	// Try to parse value

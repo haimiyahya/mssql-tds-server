@@ -63,16 +63,19 @@ func ParseCondition(expr string) (*LogicalCondition, error) {
 	// Try to find AND/OR operators (outermost only)
 	andOrPos := findOutermostLogicalOp(expr, "AND", "OR")
 	if andOrPos >= 0 {
-		// Get operator
-		parts := strings.Fields(expr[andOrPos:andOrPos+5])
-		if len(parts) == 0 {
-			return nil, fmt.Errorf("invalid logical operator at position %d", andOrPos)
-		}
-		logOp := LogicalOperator(strings.ToUpper(parts[0]))
-
-		// Recursively parse left and right
+		// Get operator - don't use Fields() as it loses special chars
 		leftExpr := strings.TrimSpace(expr[:andOrPos])
-		rightExpr := strings.TrimSpace(expr[andOrPos+len(logOp)+1:])
+
+		// Find operator and extract right side properly
+		rightPart := strings.TrimSpace(expr[andOrPos:])
+		rightExpr := ""
+		if strings.HasPrefix(strings.ToUpper(rightPart), "AND ") {
+			rightExpr = strings.TrimSpace(rightPart[4:])
+		} else if strings.HasPrefix(strings.ToUpper(rightPart), "OR ") {
+			rightExpr = strings.TrimSpace(rightPart[3:])
+		} else {
+			rightExpr = rightPart
+		}
 
 		left, err := ParseCondition(leftExpr)
 		if err != nil {
@@ -86,7 +89,7 @@ func ParseCondition(expr string) (*LogicalCondition, error) {
 
 		return &LogicalCondition{
 			Left:     left,
-			Operator:  logOp,
+			Operator:  "AND",
 			Right:    right,
 		}, nil
 	}
@@ -196,7 +199,7 @@ func findOutermostLogicalOp(expr, op1, op2 string) int {
 // Evaluate evaluates a condition with given variable values
 func Evaluate(condition *LogicalCondition, variables map[string]interface{}) (bool, error) {
 	if condition == nil {
-		return true, nil
+		return false, nil
 	}
 
 	// Logical condition (AND/OR)

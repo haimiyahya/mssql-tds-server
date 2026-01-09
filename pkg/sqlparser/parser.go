@@ -1501,12 +1501,17 @@ func ExtractWhereClause(query string) string {
 
 // StripComments removes SQL comments from a query
 func StripComments(query string) string {
-	// Remove single-line comments (--)
-	re := regexp.MustCompile(`--[^\n]*\n`)
-	query = re.ReplaceAllString(query, " ")
+	// Remove single-line comments (--) including at end of string
+	re := regexp.MustCompile(`--[^\n]*(?:\n|$)`)
+	query = re.ReplaceAllString(query, "")
 
 	// Remove multi-line comments (/* */)
 	re = regexp.MustCompile(`/\*.*?\*/`)
+	query = re.ReplaceAllString(query, "")
+
+	// Clean up extra spaces
+	query = strings.ReplaceAll(query, "\n", " ")
+	re = regexp.MustCompile(`\s+`)
 	query = re.ReplaceAllString(query, " ")
 
 	return strings.TrimSpace(query)

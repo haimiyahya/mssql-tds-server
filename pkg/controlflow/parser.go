@@ -275,7 +275,26 @@ func SplitStatements(body string) ([]string, error) {
 	inIFBlock := 0
 	inWHILEBlock := 0
 
-	for _, ch := range body {
+	for i, ch := range body {
+		// Handle escaped quotes
+		if ch == '\'' && i > 0 && body[i-1] == '\\' {
+			// It's an escaped quote, don't toggle inQuotes
+			current += string(ch)
+			continue
+		}
+
+		// Check for END followed by semicolon before processing whitespace
+		if strings.HasSuffix(strings.ToUpper(current), "END") && ch == ';' && inQuotes == false && inParentheses == 0 {
+			// END block ends with semicolon - split the END statement, then add semicolon to next statement
+			stmt := strings.TrimSpace(strings.TrimSuffix(current, "END;"))
+			stmt += "END;"
+			if stmt != "" {
+				statements = append(statements, stmt)
+			}
+			current = ""
+			continue
+		}
+
 		switch ch {
 		case '\'':
 			inQuotes = !inQuotes

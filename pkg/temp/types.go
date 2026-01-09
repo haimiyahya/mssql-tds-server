@@ -241,7 +241,7 @@ func IsTempTable(name string) bool {
 
 // NormalizeTableName normalizes a temporary table name (removes # prefix)
 func NormalizeTableName(name string) string {
-	return strings.TrimPrefix(name, "#")
+	return strings.TrimLeft(name, "#")
 }
 
 // ParseCreateTable parses a CREATE TABLE statement for temporary tables
