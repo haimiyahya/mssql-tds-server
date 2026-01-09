@@ -45,6 +45,7 @@ type SelectStatement struct {
 	IsAggregateQuery  bool
 	GroupBy           []GroupByClause
 	HavingClause      string
+	HasSubqueries     bool // True if query contains subqueries
 }
 
 // OrderByClause represents an ORDER BY clause

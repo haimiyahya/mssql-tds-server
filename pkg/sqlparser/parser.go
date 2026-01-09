@@ -82,6 +82,9 @@ func (p *Parser) parseSelect(query string) *Statement {
 	aggregates := p.parseAggregates(columnsPart)
 	isAggregateQuery := len(aggregates) > 0
 
+	// Check for subqueries
+	hasSubqueries := p.detectSubqueries(query)
+
 	// Find ORDER BY clause (optional) - parse this first as it comes last
 	orderByIndex := strings.Index(upperQuery, " ORDER BY ")
 	var orderByClause []OrderByClause
@@ -176,6 +179,7 @@ func (p *Parser) parseSelect(query string) *Statement {
 			IsAggregateQuery:  isAggregateQuery,
 			GroupBy:          groupByClause,
 			HavingClause:     havingClause,
+			HasSubqueries:    hasSubqueries,
 		},
 		RawQuery: query,
 	}
@@ -386,6 +390,34 @@ func (p *Parser) parseAggregates(columnsPart string) []AggregateFunction {
 	}
 
 	return aggregates
+}
+
+// detectSubqueries checks if a query contains subqueries
+func (p *Parser) detectSubqueries(query string) bool {
+	upperQuery := strings.ToUpper(query)
+
+	// Common subquery patterns
+	subqueryPatterns := []string{
+		" IN (SELECT ",
+		" NOT IN (SELECT ",
+		" EXISTS (SELECT ",
+		" NOT EXISTS (SELECT ",
+		" = (SELECT ",
+		" != (SELECT ",
+		" <> (SELECT ",
+		" > (SELECT ",
+		" < (SELECT ",
+		" >= (SELECT ",
+		" <= (SELECT ",
+	}
+
+	for _, pattern := range subqueryPatterns {
+		if strings.Contains(upperQuery, pattern) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // parseInsert parses an INSERT statement

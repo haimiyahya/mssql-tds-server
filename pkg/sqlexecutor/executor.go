@@ -167,6 +167,18 @@ func (e *Executor) executeSelect(query string) (*ExecuteResult, error) {
 	// }
 	// For now, let SQLite handle all JOINs (will fail on RIGHT and FULL with error)
 
+	// Handle Subqueries
+	// For Phase 11 Iteration 5, we'll let SQLite handle subqueries
+	// SQLite supports subqueries natively in WHERE clause (IN, EXISTS, =, !=, >, <, >=, <=)
+	// SQLite supports subqueries in SELECT list
+	// SQLite supports subqueries in FROM clause (derived tables)
+	// In a more advanced implementation, we would:
+	// if stmt.Select.HasSubqueries {
+	// 	// Parse and execute subqueries separately
+	// 	// Substitute subquery results into main query
+	// }
+	// For now, let SQLite handle all subqueries
+
 	return &ExecuteResult{
 		Columns:  columns,
 		Rows:     resultRows,
