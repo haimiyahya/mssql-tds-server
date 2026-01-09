@@ -138,6 +138,18 @@ func (e *Executor) executeSelect(query string) (*ExecuteResult, error) {
 	// }
 	// For now, SQLite handles all aggregate calculations
 
+	// Handle GROUP BY and HAVING
+	// For Phase 11 Iteration 3, we'll let SQLite handle GROUP BY and HAVING
+	// SQLite supports GROUP BY and HAVING natively
+	// In a more advanced implementation, we would:
+	// if len(stmt.Select.GroupBy) > 0 {
+	// 	resultRows = e.groupBy(resultRows, stmt.Select.GroupBy, stmt.Select.Aggregates)
+	// 	if stmt.Select.HavingClause != "" {
+	// 		resultRows = e.filterHaving(resultRows, stmt.Select.HavingClause)
+	// 	}
+	// }
+	// For now, SQLite handles all GROUP BY and HAVING calculations
+
 	return &ExecuteResult{
 		Columns:  columns,
 		Rows:     resultRows,

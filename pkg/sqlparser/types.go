@@ -42,12 +42,19 @@ type SelectStatement struct {
 	OrderBy           []OrderByClause
 	Aggregates        []AggregateFunction
 	IsAggregateQuery  bool
+	GroupBy           []GroupByClause
+	HavingClause      string
 }
 
 // OrderByClause represents an ORDER BY clause
 type OrderByClause struct {
 	Column    string
 	Direction string // "ASC" or "DESC"
+}
+
+// GroupByClause represents a GROUP BY clause
+type GroupByClause struct {
+	Column string
 }
 
 // AggregateFunction represents an aggregate function

@@ -52,7 +52,7 @@ func (p *Parser) Parse(query string) (*Statement, error) {
 // parseSelect parses a SELECT statement
 func (p *Parser) parseSelect(query string) *Statement {
 	// Extract columns and table name
-	// Format: SELECT [DISTINCT] [columns] FROM [table] [WHERE clause] [ORDER BY clause]
+	// Format: SELECT [DISTINCT] [columns] FROM [table] [WHERE clause] [GROUP BY clause] [HAVING clause] [ORDER BY clause]
 
 	upperQuery := strings.ToUpper(query)
 
@@ -82,16 +82,34 @@ func (p *Parser) parseSelect(query string) *Statement {
 	aggregates := p.parseAggregates(columnsPart)
 	isAggregateQuery := len(aggregates) > 0
 
-	// Find ORDER BY clause (optional)
+	// Find ORDER BY clause (optional) - parse this first as it comes last
 	orderByIndex := strings.Index(upperQuery, " ORDER BY ")
 	var orderByClause []OrderByClause
+	var havingClause string
+	var groupByClause []GroupByClause
 	var whereClause string
 	var tableName string
 
-	// Parse ORDER BY first (comes after WHERE or FROM)
+	// Parse ORDER BY first (comes after HAVING or GROUP BY or WHERE or FROM)
 	if orderByIndex != -1 {
 		orderByClause = p.parseOrderBy(query[orderByIndex+9:]) // 9 = len(" ORDER BY ")
 		query = strings.TrimSpace(query[:orderByIndex])
+		upperQuery = strings.ToUpper(query)
+	}
+
+	// Find HAVING clause (optional) - comes after GROUP BY
+	havingIndex := strings.Index(upperQuery, " HAVING ")
+	if havingIndex != -1 {
+		havingClause = strings.TrimSpace(query[havingIndex+7:]) // 7 = len(" HAVING ")
+		query = strings.TrimSpace(query[:havingIndex])
+		upperQuery = strings.ToUpper(query)
+	}
+
+	// Find GROUP BY clause (optional) - comes after WHERE
+	groupByIndex := strings.Index(upperQuery, " GROUP BY ")
+	if groupByIndex != -1 {
+		groupByClause = p.parseGroupBy(query[groupByIndex+9:]) // 9 = len(" GROUP BY ")
+		query = strings.TrimSpace(query[:groupByIndex])
 		upperQuery = strings.ToUpper(query)
 	}
 
@@ -123,6 +141,8 @@ func (p *Parser) parseSelect(query string) *Statement {
 			OrderBy:           orderByClause,
 			Aggregates:       aggregates,
 			IsAggregateQuery:  isAggregateQuery,
+			GroupBy:          groupByClause,
+			HavingClause:     havingClause,
 		},
 		RawQuery: query,
 	}
@@ -161,6 +181,29 @@ func (p *Parser) parseOrderBy(orderByClause string) []OrderByClause {
 	}
 
 	return orderByClauses
+}
+
+// parseGroupBy parses a GROUP BY clause
+func (p *Parser) parseGroupBy(groupByClause string) []GroupByClause {
+	// Remove trailing semicolon if present
+	groupByClause = strings.TrimSpace(strings.TrimSuffix(groupByClause, ";"))
+
+	// Split by comma
+	columnParts := strings.Split(groupByClause, ",")
+	groupByClauses := make([]GroupByClause, 0, len(columnParts))
+
+	for _, part := range columnParts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		groupByClauses = append(groupByClauses, GroupByClause{
+			Column: part,
+		})
+	}
+
+	return groupByClauses
 }
 
 // parseAggregates parses aggregate functions from column list
