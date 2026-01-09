@@ -487,8 +487,14 @@ func (p *Parser) parseInsert(query string) *Statement {
 	// Find VALUES keyword
 	valuesIndex := strings.Index(strings.ToUpper(query[valuesStart:]), " VALUES ")
 	if valuesIndex == -1 {
+		// Still return table name even without VALUES keyword
 		return &Statement{
-			Type:    StatementTypeInsert,
+			Type: StatementTypeInsert,
+			Insert: &InsertStatement{
+				Table:  tableName,
+				Columns: columns,
+				Values: [][]interface{}{},
+			},
 			RawQuery: query,
 		}
 	}

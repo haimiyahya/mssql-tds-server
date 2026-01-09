@@ -4,15 +4,17 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/factory/mssql-tds-server/pkg/database"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func setupTestDB(t *testing.T) *sql.DB {
+func setupTestDB(t *testing.T) (*sql.DB, *database.Catalog) {
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	return db
+	catalog := database.NewCatalog("", db)
+	return db, catalog
 }
 
 func TestConvertValueToString(t *testing.T) {
@@ -84,7 +86,7 @@ func TestFindSubstring(t *testing.T) {
 }
 
 func TestExecutorSelect(t *testing.T) {
-	db := setupTestDB(t)
+	db, catalog := setupTestDB(t)
 	defer db.Close()
 
 	// Create test table
@@ -99,7 +101,7 @@ func TestExecutorSelect(t *testing.T) {
 		t.Fatalf("Failed to insert test data: %v", err)
 	}
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, catalog)
 	result, err := executor.Execute("SELECT * FROM test")
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -119,7 +121,7 @@ func TestExecutorSelect(t *testing.T) {
 }
 
 func TestExecutorInsert(t *testing.T) {
-	db := setupTestDB(t)
+	db, catalog := setupTestDB(t)
 	defer db.Close()
 
 	// Create test table
@@ -128,7 +130,7 @@ func TestExecutorInsert(t *testing.T) {
 		t.Fatalf("Failed to create test table: %v", err)
 	}
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, catalog)
 	result, err := executor.Execute("INSERT INTO test (id, name) VALUES (1, 'Alice')")
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -148,7 +150,7 @@ func TestExecutorInsert(t *testing.T) {
 }
 
 func TestExecutorUpdate(t *testing.T) {
-	db := setupTestDB(t)
+	db, catalog := setupTestDB(t)
 	defer db.Close()
 
 	// Create test table
@@ -163,7 +165,7 @@ func TestExecutorUpdate(t *testing.T) {
 		t.Fatalf("Failed to insert test data: %v", err)
 	}
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, catalog)
 	result, err := executor.Execute("UPDATE test SET name = 'Bob' WHERE id = 1")
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -179,7 +181,7 @@ func TestExecutorUpdate(t *testing.T) {
 }
 
 func TestExecutorDelete(t *testing.T) {
-	db := setupTestDB(t)
+	db, catalog := setupTestDB(t)
 	defer db.Close()
 
 	// Create test table
@@ -194,7 +196,7 @@ func TestExecutorDelete(t *testing.T) {
 		t.Fatalf("Failed to insert test data: %v", err)
 	}
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, catalog)
 	result, err := executor.Execute("DELETE FROM test WHERE id = 1")
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -210,10 +212,10 @@ func TestExecutorDelete(t *testing.T) {
 }
 
 func TestExecutorCreateTable(t *testing.T) {
-	db := setupTestDB(t)
+	db, catalog := setupTestDB(t)
 	defer db.Close()
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, catalog)
 	result, err := executor.Execute("CREATE TABLE test (id INTEGER, name TEXT)")
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -233,7 +235,7 @@ func TestExecutorCreateTable(t *testing.T) {
 }
 
 func TestExecutorDropTable(t *testing.T) {
-	db := setupTestDB(t)
+	db, catalog := setupTestDB(t)
 	defer db.Close()
 
 	// Create test table
@@ -242,7 +244,7 @@ func TestExecutorDropTable(t *testing.T) {
 		t.Fatalf("Failed to create test table: %v", err)
 	}
 
-	executor := NewExecutor(db)
+	executor := NewExecutor(db, catalog)
 	result, err := executor.Execute("DROP TABLE test")
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -262,7 +264,7 @@ func TestExecutorDropTable(t *testing.T) {
 }
 
 func TestConvertCreateTable(t *testing.T) {
-	executor := NewExecutor(nil)
+	executor := NewExecutor(nil, nil)
 
 	tests := []struct {
 		input    string

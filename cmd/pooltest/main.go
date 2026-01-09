@@ -89,7 +89,7 @@ func testConnectionPoolConfiguration(db *sql.DB) {
 
 	log.Println("✓ Connection pool configured:")
 	log.Printf("  Max Open Connections: %d", db.Stats().MaxOpenConnections)
-	log.Printf("  Max Idle Connections: %d (target)")
+	log.Printf("  Max Idle Connections: %d (target)", 10)
 	log.Printf("  Connection Max Lifetime: %s", "5 minutes")
 	log.Printf("  Connection Max Idle Time: %s", "1 minute")
 

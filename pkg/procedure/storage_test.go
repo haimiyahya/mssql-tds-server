@@ -37,7 +37,7 @@ func setupTestDB(t *testing.T) (*sqlite.Database, *Storage, func()) {
 }
 
 func TestStorage_Create(t *testing.T) {
-	db, storage, cleanup := setupTestDB(t)
+	_, storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	proc := &Procedure{
@@ -59,7 +59,7 @@ func TestStorage_Create(t *testing.T) {
 }
 
 func TestStorage_Get(t *testing.T) {
-	db, storage, cleanup := setupTestDB(t)
+	_, storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	// Create a procedure
@@ -96,7 +96,7 @@ func TestStorage_Get(t *testing.T) {
 }
 
 func TestStorage_Get_NotFound(t *testing.T) {
-	db, storage, cleanup := setupTestDB(t)
+	_, storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	_, err := storage.Get("NONEXISTENT")
@@ -106,7 +106,7 @@ func TestStorage_Get_NotFound(t *testing.T) {
 }
 
 func TestStorage_List(t *testing.T) {
-	db, storage, cleanup := setupTestDB(t)
+	_, storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	// Create multiple procedures
@@ -135,7 +135,7 @@ func TestStorage_List(t *testing.T) {
 }
 
 func TestStorage_Drop(t *testing.T) {
-	db, storage, cleanup := setupTestDB(t)
+	_, storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	// Create a procedure
@@ -164,7 +164,7 @@ func TestStorage_Drop(t *testing.T) {
 }
 
 func TestStorage_Drop_NotFound(t *testing.T) {
-	db, storage, cleanup := setupTestDB(t)
+	_, storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	err := storage.Drop("NONEXISTENT")
@@ -174,7 +174,7 @@ func TestStorage_Drop_NotFound(t *testing.T) {
 }
 
 func TestStorage_Exists(t *testing.T) {
-	db, storage, cleanup := setupTestDB(t)
+	_, storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	// Test non-existent procedure
@@ -209,7 +209,7 @@ func TestStorage_Exists(t *testing.T) {
 }
 
 func TestStorage_Duplicate(t *testing.T) {
-	db, storage, cleanup := setupTestDB(t)
+	_, storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	// Create a procedure

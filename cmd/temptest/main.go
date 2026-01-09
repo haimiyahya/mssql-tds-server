@@ -84,7 +84,12 @@ func testExecuteTempTableCreation(db *sql.DB) {
 	}
 	defer rows.Close()
 
-	log.Printf("✓ Executed temp table creation, returned %d columns", len(rows.Columns()))
+	cols, err := rows.Columns()
+	if err != nil {
+		log.Printf("Error getting columns: %v", err)
+		return
+	}
+	log.Printf("✓ Executed temp table creation, returned %d columns", len(cols))
 }
 
 func testCreateTempTableWhile(db *sql.DB) {
