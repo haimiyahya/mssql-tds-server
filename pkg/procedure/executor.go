@@ -221,7 +221,7 @@ func (e *Executor) executeInsertTempTable(sql string, sessionID string) ([][]str
 		return nil, fmt.Errorf("invalid INSERT INTO syntax for temp table")
 	}
 
-	tableName := strings.TrimSpace(matches[0])
+	tableName := strings.TrimSpace(matches)
 	tableName = temp.NormalizeTableName(tableName[11:]) // Remove "INSERT INTO " (11 chars)
 
 	// Parse VALUES part (simple parsing)
@@ -276,7 +276,7 @@ func (e *Executor) executeSelectTempTable(sql string, sessionID string) ([][]str
 		return nil, fmt.Errorf("invalid SELECT FROM syntax for temp table")
 	}
 
-	tableName := strings.TrimSpace(matches[0])
+	tableName := strings.TrimSpace(matches)
 	tableName = temp.NormalizeTableName(tableName[5:]) // Remove "FROM "
 
 	// Get table
@@ -475,54 +475,54 @@ func (e *Executor) executeSelectAssignment(stmt string, ctx *variable.Context) (
 }
 
 // executeQuery handles regular SELECT queries
-func (e *Executor) executeQuery(sql string, paramValues map[string]interface{}, ctx *variable.Context, sessionID string, txCtx *transaction.Context) ([][]string, error) {
+func (e *Executor) executeQuery(query string, paramValues map[string]interface{}, ctx *variable.Context, sessionID string, txCtx *transaction.Context) ([][]string, error) {
 	// Replace procedure parameters first
-	sql, err := e.replaceParameters(sql, paramValues)
+	replacedSQL, err := e.replaceParameters(query, paramValues)
 	if err != nil {
 		return nil, err
 	}
 
 	// Replace variables
-	sql, err = variable.ReplaceVariables(sql, ctx)
+	processedSQL, err := variable.ReplaceVariables(replacedSQL, ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check for temp table operations
-	tempTableRefs := temp.DetectTempTableReference(sql)
+	tempTableRefs := temp.DetectTempTableReference(processedSQL)
 	if len(tempTableRefs) > 0 {
 		// Check if this is a temp table operation (INSERT, SELECT, UPDATE, DELETE on #temp)
-		sqlUpper := strings.ToUpper(sql)
-		if strings.HasPrefix(sqlUpper, "INSERT INTO") && temp.IsTempTable(sql) {
-			return e.executeInsertTempTable(sql, sessionID)
+		sqlUpper := strings.ToUpper(processedSQL)
+		if strings.HasPrefix(sqlUpper, "INSERT INTO") && temp.IsTempTable(processedSQL) {
+			return e.executeInsertTempTable(processedSQL, sessionID)
 		}
-		if strings.HasPrefix(sqlUpper, "UPDATE") && temp.IsTempTable(sql) {
-			return e.executeUpdateTempTable(sql, ctx, sessionID)
+		if strings.HasPrefix(sqlUpper, "UPDATE") && temp.IsTempTable(processedSQL) {
+			return e.executeUpdateTempTable(processedSQL, ctx, sessionID)
 		}
-		if strings.HasPrefix(sqlUpper, "DELETE FROM") && temp.IsTempTable(sql) {
-			return e.executeDeleteTempTable(sql, ctx, sessionID)
+		if strings.HasPrefix(sqlUpper, "DELETE FROM") && temp.IsTempTable(processedSQL) {
+			return e.executeDeleteTempTable(processedSQL, ctx, sessionID)
 		}
-		if strings.HasPrefix(sqlUpper, "SELECT") && temp.IsTempTable(sql) {
-			return e.executeSelectTempTable(sql, sessionID)
+		if strings.HasPrefix(sqlUpper, "SELECT") && temp.IsTempTable(processedSQL) {
+			return e.executeSelectTempTable(processedSQL, sessionID)
 		}
 
 		// Replace temp table names with internal names
-		sql = temp.ReplaceTempTableNames(sql, sessionID)
+		processedSQL = temp.ReplaceTempTableNames(processedSQL, sessionID)
 	}
 
 	// Execute SQL (use active transaction if available)
 	var rows *sql.Rows
-	var err error
+	var execErr error
 
 	if txCtx.IsActive() {
 		tx := txCtx.GetCurrentTx()
-		rows, err = tx.Query(sql)
+		rows, execErr = tx.Query(processedSQL)
 	} else {
-		rows, err = e.db.Query(sql)
+		rows, execErr = e.db.Query(processedSQL)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+	if execErr != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", execErr)
 	}
 	defer rows.Close()
 
@@ -676,7 +676,8 @@ func (e *Executor) executeWHILE(stmt string, paramValues map[string]interface{},
 	// Loop while condition is true
 	for iterations < maxIterations {
 		// Get all variables from context
-		variables := ctx.GetAll()
+		vars := ctx.GetAll()
+		variables := e.convertVariablesToInterface(vars)
 
 		// Evaluate condition
 		conditionResult, err := controlflow.Evaluate(block.Condition, variables)
@@ -720,7 +721,8 @@ func (e *Executor) executeIF(stmt string, paramValues map[string]interface{}, ct
 	}
 
 	// Get all variables from context
-	variables := ctx.GetAll()
+	vars := ctx.GetAll()
+	variables := e.convertVariablesToInterface(vars)
 
 	// Evaluate condition
 	conditionResult, err := controlflow.Evaluate(block.Condition, variables)
@@ -767,4 +769,15 @@ func (e *Executor) executeBlock(block string, paramValues map[string]interface{}
 	}
 
 	return results, nil
+}
+
+// convertVariablesToInterface converts map[string]*Variable to map[string]interface{}
+func (e *Executor) convertVariablesToInterface(vars map[string]*variable.Variable) map[string]interface{} {
+	result := make(map[string]interface{})
+	for name, v := range vars {
+		if v != nil {
+			result[name] = v.Value
+		}
+	}
+	return result
 }
