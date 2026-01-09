@@ -4,7 +4,9 @@ A fully-featured Microsoft SQL Server-compatible server implementing the TDS (Ta
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Phase Status](https://img.shields.io/badge/Phase-39%20Complete-brightgreen.svg)](PHASE39_PROGRESS.md)
+[![Phase Status](https://img.shields.io/badge/Phase-40%20Complete-brightgreen.svg)](PHASE40_PROGRESS.md)
+![Database Management](https://img.shields.io/badge/Database%20Management-Complete-brightgreen.svg)
+![Trash%2FRecycle%20Bin](https://img.shields.io/badge/Trash%2FRecycle%20Bin-Complete-brightgreen.svg)
 
 ## Table of Contents
 
@@ -45,7 +47,13 @@ The MSSQL TDS Server is a high-performance, fully-featured database server that 
 
 **Project Status**: ✅ Production Ready
 
-**Latest Phase**: Phase 39 - Database Administration UI (COMPLETE)
+**Latest Phase**: Phase 40 - Database Management (COMPLETE)
+- CREATE DATABASE support
+- DROP DATABASE support (moves to recycle bin/trash)
+- USE DATABASE support
+- sys.databases view support
+- Multi-database queries
+- Stored procedure and function database-scoped storage
 
 **Progress**: 39 of 39 planned phases complete (100%)
 
@@ -97,6 +105,99 @@ The MSSQL TDS Server is a high-performance, fully-featured database server that 
 - ✅ Phase 39: Database Administration UI## Features
 
 ### Core SQL Operations
+
+### Database Management
+
+**Database Commands**
+- `CREATE DATABASE` - Create new database
+  - Creates SQLite database file in `./data/` directory
+  - Creates system tables (sys_objects, sys_columns)
+  - Adds entry to database catalog (master.sys_databases)
+  - Validates database name (alphanumeric, underscores, hyphens)
+  - Prevents creating system databases (master, tempdb, model, msdb)
+- `DROP DATABASE` - Delete database
+  - **Moves SQLite file to OS recycle bin/trash** (not permanent deletion)
+  - Removes entry from database catalog (master.sys_databases)
+  - Closes database connections
+  - Prevents dropping system databases
+  - Prevents dropping currently used database
+  - File can be restored from recycle bin/trash
+  - Cross-platform support: Windows (Recycle Bin), macOS (Trash), Linux (Trash)
+- `USE database_name` - Switch current database context
+  - Opens connection to specified database
+  - Closes previous database connection
+  - Caches database connections for reuse
+  - Updates current database state
+
+**Database Catalog**
+- `sys.databases` - View all databases
+  - Lists all databases (system and user)
+  - Shows database metadata (name, ID, state, create_date, file_path, is_system)
+  - Supports SELECT queries
+  - Returns SQL Server-compatible format
+- `master.sys_databases` - Catalog table
+  - Stores database metadata
+  - Tracks database files and paths
+  - Supports database listing and management
+- `master.sys_procedures` - Stored procedure catalog
+  - Tracks procedures and their databases
+  - Maps procedures to specific databases
+  - Procedures stored in database they're created in
+- `master.sys_functions` - Function catalog
+  - Tracks functions and their databases
+  - Maps functions to specific databases
+  - Functions stored in database they're created in
+
+**Multi-Database Queries**
+- Cross-database queries supported
+  - Use `DatabaseName.TableName` syntax
+  - Server attaches databases on-demand
+  - Translates SQL Server syntax (`DatabaseName.schema.TableName`) to SQLite (`DatabaseName.TableName`)
+  - Support for JOINs across databases
+- Example:
+  ```sql
+  SELECT u.name, o.order_date
+  FROM UserDB1.Users u
+  JOIN UserDB2.Orders o ON u.id = o.user_id
+  ```
+
+**Database Storage**
+- Each database = Separate SQLite file
+  - Database files stored in `./data/` directory
+  - Filename format: `DatabaseName.db`
+  - System databases: `master.db`, `tempdb.db`, `model.db`, `msdb.db`
+  - User databases: `UserDB1.db`, `UserDB2.db`, etc.
+- Stored procedures stored in specific database
+  - Procedures created in database X are stored in database X
+  - Database-scoped storage (not server-scoped)
+  - Catalog tracks which database owns each procedure
+  - Use `USE database_name` before creating procedure
+- Functions stored in specific database
+  - Functions created in database X are stored in database X
+  - Database-scoped storage (not server-scoped)
+  - Catalog tracks which database owns each function
+  - Use `USE database_name` before creating function
+
+**Trash/Recycle Bin Support**
+- DROP DATABASE behavior
+  - **Moves database file to OS recycle bin/trash**
+  - File can be restored from recycle bin/trash
+  - Provides data safety and recovery options
+  - Cross-platform support:
+    - Windows: Uses PowerShell to move to Recycle Bin
+    - macOS: Uses AppleScript to move to Trash
+    - Linux: Uses gio or trash-cli to move to Trash
+    - Fallback: Manual `./trash` directory with timestamped filenames
+- Restore from trash
+  - Windows: Recycle Bin → Right-click → Restore
+  - macOS: Trash → Right-click → Put Back
+  - Linux: Trash → Right-click → Restore
+  - Manual: Move file from `./trash` to `./data`
+- Empty trash
+  - Windows: Right-click Recycle Bin → Empty Recycle Bin
+  - macOS: Finder → Empty Trash
+  - Linux: Trash → Empty Trash
+  - Manual: Delete files from `./trash` directory
 
 **Data Definition Language (DDL)**
 - `CREATE TABLE` - Create tables with various data types

@@ -36,7 +36,7 @@ func NewCatalog(dataDir string, masterDB *sql.DB) *Catalog {
 	// Create master database if it doesn't exist
 	masterPath := filepath.Join(dataDir, "master.db")
 	if _, err := os.Stat(masterPath); os.IsNotExist(err) {
-		db, err := sql.Open("sqlite", masterPath)
+		db, err := sql.Open("sqlite3", masterPath)
 		if err != nil {
 			fmt.Printf("Error creating master database: %v\n", err)
 			return nil
@@ -198,7 +198,7 @@ func (c *Catalog) CreateDatabase(dbName string) (*Database, error) {
 	}
 
 	// Create new database file
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("error creating database file: %w", err)
 	}
@@ -326,7 +326,7 @@ func (c *Catalog) OpenDatabase(dbName string) (*sql.DB, error) {
 	}
 
 	// Open database
-	conn, err := sql.Open("sqlite", db.FilePath)
+	conn, err := sql.Open("sqlite3", db.FilePath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %w", err)
 	}
