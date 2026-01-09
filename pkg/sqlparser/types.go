@@ -11,6 +11,7 @@ const (
 	StatementTypeDelete
 	StatementTypeCreateTable
 	StatementTypeDropTable
+	StatementTypeAlterTable
 	StatementTypeCreateView
 	StatementTypeDropView
 	StatementTypeCreateIndex
@@ -35,6 +36,8 @@ func (st StatementType) String() string {
 		return "CREATE TABLE"
 	case StatementTypeDropTable:
 		return "DROP TABLE"
+	case StatementTypeAlterTable:
+		return "ALTER TABLE"
 	case StatementTypeCreateView:
 		return "CREATE VIEW"
 	case StatementTypeDropView:
@@ -126,6 +129,15 @@ type DropTableStatement struct {
 	TableName string
 }
 
+// AlterTableStatement represents an ALTER TABLE statement
+type AlterTableStatement struct {
+	TableName string
+	Action   string // "ADD", "DROP", "RENAME TO", "RENAME COLUMN"
+	Column   string // Column name (for ADD, DROP, RENAME COLUMN)
+	Type     string // Column type (for ADD)
+	NewName  string // New name (for RENAME TO, RENAME COLUMN)
+}
+
 // CreateViewStatement represents a CREATE VIEW statement
 type CreateViewStatement struct {
 	ViewName  string
@@ -183,6 +195,7 @@ type Statement struct {
 	Delete                 *DeleteStatement
 	CreateTable            *CreateTableStatement
 	DropTable              *DropTableStatement
+	AlterTable             *AlterTableStatement
 	CreateView             *CreateViewStatement
 	DropView               *DropViewStatement
 	CreateIndex            *CreateIndexStatement

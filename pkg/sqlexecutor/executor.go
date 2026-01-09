@@ -60,6 +60,9 @@ func (e *Executor) Execute(query string) (*ExecuteResult, error) {
 	case sqlparser.StatementTypeDropTable:
 		return e.executeDropTable(query)
 
+	case sqlparser.StatementTypeAlterTable:
+		return e.executeAlterTable(query)
+
 	case sqlparser.StatementTypeCreateView:
 		return e.executeCreateView(query)
 
@@ -295,6 +298,45 @@ func (e *Executor) executeDropTable(query string) (*ExecuteResult, error) {
 		RowCount: 0,
 		IsQuery:  false,
 		Message:  "Table dropped successfully",
+	}, nil
+}
+
+// executeAlterTable executes an ALTER TABLE statement
+func (e *Executor) executeAlterTable(query string) (*ExecuteResult, error) {
+	// Parse query to get ALTER TABLE information
+	stmt, err := sqlparser.NewParser().Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ALTER TABLE: %w", err)
+	}
+
+	if stmt.Type != sqlparser.StatementTypeAlterTable || stmt.AlterTable == nil {
+		return nil, fmt.Errorf("invalid ALTER TABLE statement")
+	}
+
+	// Execute ALTER TABLE on SQLite (SQLite supports ALTER TABLE natively)
+	// SQLite supports: ADD COLUMN, RENAME TO, RENAME COLUMN
+	// SQLite doesn't support: DROP COLUMN, ALTER COLUMN
+	_, err = e.db.Exec(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute ALTER TABLE: %w", err)
+	}
+
+	var message string
+	switch stmt.AlterTable.Action {
+	case "ADD":
+		message = fmt.Sprintf("Column '%s' added to table '%s'", stmt.AlterTable.Column, stmt.AlterTable.TableName)
+	case "RENAME TO":
+		message = fmt.Sprintf("Table '%s' renamed to '%s'", stmt.AlterTable.TableName, stmt.AlterTable.NewName)
+	case "RENAME COLUMN":
+		message = fmt.Sprintf("Column '%s' in table '%s' renamed to '%s'", stmt.AlterTable.Column, stmt.AlterTable.TableName, stmt.AlterTable.NewName)
+	default:
+		message = fmt.Sprintf("ALTER TABLE '%s' executed successfully", stmt.AlterTable.TableName)
+	}
+
+	return &ExecuteResult{
+		RowCount: 0,
+		IsQuery:  false,
+		Message:  message,
 	}, nil
 }
 

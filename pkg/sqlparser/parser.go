@@ -38,6 +38,8 @@ func (p *Parser) Parse(query string) (*Statement, error) {
 		stmt = p.parseCreateTable(query)
 	} else if strings.HasPrefix(upperQuery, "DROP TABLE ") {
 		stmt = p.parseDropTable(query)
+	} else if strings.HasPrefix(upperQuery, "ALTER TABLE ") {
+		stmt = p.parseAlterTable(query)
 	} else if strings.HasPrefix(upperQuery, "CREATE VIEW ") {
 		stmt = p.parseCreateView(query)
 	} else if strings.HasPrefix(upperQuery, "DROP VIEW ") {
@@ -651,6 +653,97 @@ func (p *Parser) parseDropTable(query string) *Statement {
 		DropTable: &DropTableStatement{
 			TableName: tableName,
 		},
+		RawQuery: query,
+	}
+}
+
+// parseAlterTable parses an ALTER TABLE statement
+func (p *Parser) parseAlterTable(query string) *Statement {
+	// Format: ALTER TABLE table_name ADD COLUMN column_name column_type
+	// Format: ALTER TABLE table_name RENAME TO new_table_name
+	// Format: ALTER TABLE table_name RENAME COLUMN old_name TO new_name
+	// Note: SQLite doesn't support DROP COLUMN or ALTER COLUMN natively
+
+	upperQuery := strings.ToUpper(query)
+
+	// Remove "ALTER TABLE "
+	query = strings.TrimPrefix(query, "ALTER TABLE ")
+	upperQuery = strings.TrimPrefix(upperQuery, "ALTER TABLE ")
+
+	// Find first space (separates table name from action)
+	spaceIndex := strings.Index(upperQuery, " ")
+	if spaceIndex == -1 {
+		return &Statement{
+			Type:    StatementTypeAlterTable,
+			RawQuery: query,
+		}
+	}
+
+	// Extract table name
+	tableName := strings.TrimSpace(query[:spaceIndex])
+
+	// Extract action part
+	actionPart := strings.TrimSpace(query[spaceIndex:])
+	upperActionPart := strings.ToUpper(actionPart)
+
+	// Determine action type
+	alterTableStmt := &AlterTableStatement{
+		TableName: tableName,
+	}
+
+	if strings.HasPrefix(upperActionPart, "ADD ") || strings.HasPrefix(upperActionPart, "ADD COLUMN ") {
+		// ALTER TABLE table_name ADD COLUMN column_name column_type
+		alterTableStmt.Action = "ADD"
+		actionPart = strings.TrimPrefix(actionPart, "ADD COLUMN ")
+		actionPart = strings.TrimPrefix(actionPart, "ADD ")
+		upperActionPart = strings.ToUpper(actionPart)
+
+		// Extract column name and type
+		spaceIndex = strings.Index(upperActionPart, " ")
+		if spaceIndex == -1 {
+			return &Statement{
+				Type:    StatementTypeAlterTable,
+				RawQuery: query,
+			}
+		}
+
+		alterTableStmt.Column = strings.TrimSpace(actionPart[:spaceIndex])
+		alterTableStmt.Type = strings.TrimSpace(actionPart[spaceIndex:])
+
+	} else if strings.HasPrefix(upperActionPart, "RENAME TO ") {
+		// ALTER TABLE table_name RENAME TO new_table_name
+		alterTableStmt.Action = "RENAME TO"
+		actionPart = strings.TrimPrefix(actionPart, "RENAME TO ")
+		alterTableStmt.NewName = strings.TrimSpace(actionPart)
+
+	} else if strings.HasPrefix(upperActionPart, "RENAME COLUMN ") {
+		// ALTER TABLE table_name RENAME COLUMN old_name TO new_name
+		alterTableStmt.Action = "RENAME COLUMN"
+		actionPart = strings.TrimPrefix(actionPart, "RENAME COLUMN ")
+		upperActionPart = strings.ToUpper(actionPart)
+
+		// Find TO keyword
+		toIndex := strings.Index(upperActionPart, " TO ")
+		if toIndex == -1 {
+			return &Statement{
+				Type:    StatementTypeAlterTable,
+				RawQuery: query,
+			}
+		}
+
+		alterTableStmt.Column = strings.TrimSpace(actionPart[:toIndex])
+		alterTableStmt.NewName = strings.TrimSpace(actionPart[toIndex+4:]) // 4 = len(" TO ")
+	} else {
+		// Unsupported action
+		return &Statement{
+			Type:    StatementTypeAlterTable,
+			RawQuery: query,
+		}
+	}
+
+	return &Statement{
+		Type: StatementTypeAlterTable,
+		AlterTable: alterTableStmt,
 		RawQuery: query,
 	}
 }
