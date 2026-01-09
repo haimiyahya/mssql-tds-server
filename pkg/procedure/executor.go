@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/factory/mssql-tds-server/pkg/controlflow"
 	"github.com/factory/mssql-tds-server/pkg/sqlite"
 	"github.com/factory/mssql-tds-server/pkg/variable"
 )
@@ -32,11 +33,12 @@ func (e *Executor) Execute(name string, paramValues map[string]interface{}) ([][
 		return nil, err
 	}
 
-	// Check if procedure uses variables (has DECLARE, SET, etc.)
+	// Check if procedure uses variables or control flow (has DECLARE, SET, IF, etc.)
 	bodyUpper := strings.ToUpper(proc.Body)
 	usesVariables := strings.Contains(bodyUpper, "DECLARE") ||
 		strings.Contains(bodyUpper, "SET ") ||
-		regexp.MustCompile(`SELECT\s+@\w+\s*=`).MatchString(bodyUpper)
+		regexp.MustCompile(`SELECT\s+@\w+\s*=`).MatchString(bodyUpper) ||
+		strings.Contains(bodyUpper, "IF ")
 
 	if usesVariables {
 		return e.ExecuteWithVariables(name, paramValues)
@@ -98,7 +100,7 @@ func (e *Executor) ExecuteWithVariables(name string, paramValues map[string]inte
 	ctx := variable.NewContext()
 
 	// Parse procedure body into statements
-	statements, err := variable.ParseProcedureBody(proc.Body)
+	statements, err := controlflow.SplitStatements(proc.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse procedure body: %w", err)
 	}
@@ -131,19 +133,22 @@ func (e *Executor) ExecuteWithVariables(name string, paramValues map[string]inte
 // executeStatement executes a single statement with variable context
 func (e *Executor) executeStatement(stmt string, paramValues map[string]interface{}, ctx *variable.Context) ([][]string, error) {
 	// Determine statement type
-	stmtType := variable.ParseStatement(stmt)
+	stmtType := controlflow.ParseStatement(stmt)
 
 	switch stmtType {
-	case variable.StatementDeclare:
+	case controlflow.StatementDeclare:
 		return e.executeDeclare(stmt, ctx)
 
-	case variable.StatementSet:
+	case controlflow.StatementSet:
 		return e.executeSet(stmt, ctx)
 
-	case variable.StatementSelectAssignment:
+	case controlflow.StatementSelectAssignment:
 		return e.executeSelectAssignment(stmt, ctx)
 
-	case variable.StatementQuery:
+	case controlflow.StatementIF:
+		return e.executeIF(stmt, paramValues, ctx)
+
+	case controlflow.StatementQuery:
 		return e.executeQuery(stmt, paramValues, ctx)
 
 	default:
@@ -379,6 +384,64 @@ func (e *Executor) readResults(rows *sql.Rows) ([][]string, error) {
 	// Check for errors
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	return results, nil
+}
+
+// executeIF handles IF statements
+func (e *Executor) executeIF(stmt string, paramValues map[string]interface{}, ctx *variable.Context) ([][]string, error) {
+	// Parse IF block
+	block, elseInfo, err := controlflow.ParseIFBlock(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get all variables from context
+	variables := ctx.GetAll()
+
+	// Evaluate condition
+	conditionResult, err := controlflow.Evaluate(block.Condition, variables)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate IF condition: %w", err)
+	}
+
+	// Execute appropriate block
+	if conditionResult {
+		// Execute IF body
+		return e.executeBlock(block.Body[0], paramValues, ctx)
+	}
+
+	// Execute ELSE if present
+	if elseInfo != nil && len(elseInfo) > 1 {
+		return e.executeBlock(elseInfo[1], paramValues, ctx)
+	}
+
+	// No result set for IF (if no SELECT in body)
+	return nil, nil
+}
+
+// executeBlock executes a block of SQL (IF body or ELSE body)
+func (e *Executor) executeBlock(block string, paramValues map[string]interface{}, ctx *variable.Context) ([][]string, error) {
+	// Split block into statements
+	statements, err := controlflow.SplitStatements(block)
+	if err != nil {
+		return nil, err
+	}
+
+	// Execute each statement
+	var results [][]string
+
+	for _, stmt := range statements {
+		result, err := e.executeStatement(stmt, paramValues, ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Collect results (non-nil results indicate a result set)
+		if result != nil && len(result) > 0 {
+			results = result
+		}
 	}
 
 	return results, nil

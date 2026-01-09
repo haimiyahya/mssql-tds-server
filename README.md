@@ -3,7 +3,7 @@
 A Microsoft SQL Server-compatible server implementing the TDS (Tabular Data Stream) protocol with SQLite storage backend.
 
 ## Status
-Proof of Concept - Phase 1, 2, 3, 4 & 5
+Proof of Concept - Phase 1, 2, 3, 4, 5 & 6
 
 ## Overview
 This project implements a minimal TDS server that can accept connections from standard Go mssql clients and handle basic request/response communication, including stored procedure support.
@@ -21,13 +21,15 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
 │   ├── sqlite/       # SQLite database management
 │   ├── procedure/    # Stored procedure handling
 │   ├── variable/     # Variable context and parsing
+│   ├── controlflow/  # Control flow (IF/ELSE) parsing and execution
 │   └── tds/          # TDS protocol implementation
 └── cmd/             # Server and client applications
     ├── server/       # TDS server implementation
     ├── client/       # Test client using standard mssql driver
     ├── rpctest/      # RPC procedure test client
     ├── proctest/      # Procedure test client
-    └── vartest/       # Variable test client
+    ├── vartest/       # Variable test client
+    └── controltest/  # Control flow test client
 ```
 
 ## Completed Phases
@@ -75,6 +77,15 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
 - SELECT variable assignment from queries
 - Variable reference in SQL (WHERE, SELECT lists, etc.)
 
+### Phase 6: Basic Control Flow (IF/ELSE) ✅
+- IF statement parsing (IF condition THEN statements END)
+- ELSE block support (IF condition THEN statements ELSE statements END)
+- Condition evaluation with variables
+- Support for comparison operators (=, <>, >, <, >=, <=)
+- Support for logical operators (AND, OR)
+- Conditional block execution
+- Error handling for invalid conditions
+
 **Example Usage:**
 ```sql
 -- Simple procedure (Phase 4)
@@ -87,6 +98,17 @@ AS
     DECLARE @count INT
     SELECT @count = COUNT(*) FROM users WHERE department = @dept
     SELECT @count as user_count
+
+-- Procedure with IF/ELSE (Phase 6)
+CREATE PROCEDURE CheckUserStatus @id INT
+AS
+    DECLARE @status VARCHAR(20)
+    SELECT @status = status FROM users WHERE id = @id
+
+    IF @status = 'ACTIVE'
+        SELECT 'User is active' as message
+    ELSE
+        SELECT 'User is inactive' as message
 
 -- Execute procedure
 EXEC GetUserById @id=1
@@ -102,7 +124,6 @@ See [PLAN.md](PLAN.md) for implementation phases and tasks.
 This project provides the foundation for a full-featured MSSQL-compatible server. Future phases will be implemented progressively:
 
 
-- **Phase 6**: Basic Control Flow (IF/ELSE)
 - **Phase 7**: WHILE Loops
 - **Phase 8**: Temporary Tables (#temp)
 - **Phase 9**: Transaction Management (BEGIN TRAN, COMMIT, ROLLBACK)
