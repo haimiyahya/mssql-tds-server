@@ -73,7 +73,110 @@ SELECT DISTINCT department FROM employees ORDER BY department
 - Currently relying on SQLite's native ORDER BY and DISTINCT support
 - This is actually optimal for performance
 - Custom sorting/deduplication logic could be added for special cases
-- No support yet for aggregate functions (Iteration 2)
+- No support yet for aggregate functions (Iteration 2 - NOW COMPLETE)
+- No support yet for GROUP BY/HAVING (Iteration 3)
+- No support yet for JOINs (Iteration 4)
+
+### Iteration 2: Aggregate Functions ✅
+**Status**: Complete and pushed to GitHub
+
+**Implementation Summary**:
+- Extended SQL parser to detect aggregate functions in column list
+- Added AggregateFunction struct to represent aggregate function type, column, and alias
+- Extended SelectStatement to include Aggregates and IsAggregateQuery fields
+- Implemented parseAggregates() to detect COUNT, SUM, AVG, MIN, MAX
+- Parse aggregate function type and column name
+- Handle AS aliases for aggregate functions
+- Extended SQL executor to parse query and extract aggregate information
+- Let SQLite handle aggregate functions natively (optimal approach)
+
+**Files Modified**:
+- `pkg/sqlparser/types.go`:
+  - Added `AggregateFunction` struct with Type, Column, and Alias fields
+  - Extended `SelectStatement` with `Aggregates` and `IsAggregateQuery` fields
+
+- `pkg/sqlparser/parser.go`:
+  - Updated `parseSelect()` to detect and parse aggregate functions
+  - Added `parseAggregates()` function to parse aggregate function calls
+  - Detect COUNT(*), COUNT(column), SUM(column), AVG(column), MIN(column), MAX(column)
+  - Extract function type and column name
+  - Handle AS aliases (e.g., COUNT(*) AS total)
+  - Support multiple aggregate functions in single query
+
+- `pkg/sqlexecutor/executor.go`:
+  - Updated `executeSelect()` to parse query using SQL parser
+  - Extract aggregate function information from parsed query
+  - Let SQLite handle aggregate functions natively
+  - SQLite supports COUNT, SUM, AVG, MIN, MAX natively
+  - Added comments for future custom implementation if needed
+
+**Test Client Created**:
+- `cmd/aggregatetest/main.go` - Comprehensive test client for aggregate functions
+- Test 1: CREATE TABLE
+- Test 2: INSERT data (multiple rows)
+- Test 3: COUNT(*) - Count all rows
+- Test 4: COUNT(column) - Count non-NULL values in column
+- Test 5: SUM(column) - Sum numeric values
+- Test 6: AVG(column) - Calculate average
+- Test 7: MIN(column) - Find minimum value
+- Test 8: MAX(column) - Find maximum value
+- Test 9: COUNT(DISTINCT column) - Count distinct values
+- Test 10: Multiple aggregates - All aggregates in single query
+- Test 11: Aggregates with WHERE - Filtered aggregates
+- Test 12: DROP TABLE
+
+**Example Usage Now Supported**:
+```sql
+-- COUNT
+SELECT COUNT(*) FROM employees
+SELECT COUNT(department) FROM employees
+
+-- SUM, AVG, MIN, MAX
+SELECT SUM(salary) FROM employees
+SELECT AVG(salary) FROM employees
+SELECT MIN(salary), MAX(salary) FROM employees
+
+-- COUNT(DISTINCT)
+SELECT COUNT(DISTINCT department) FROM employees
+
+-- Multiple aggregates
+SELECT COUNT(*), SUM(salary), AVG(salary), MIN(salary), MAX(salary) FROM employees
+
+-- Aggregates with WHERE
+SELECT COUNT(*), AVG(salary) FROM employees WHERE department = 'Engineering'
+
+-- Aggregates with AS alias
+SELECT COUNT(*) AS total_employees FROM employees
+SELECT SUM(salary) AS total_salary FROM employees
+```
+
+**Success Criteria Met**:
+- ✅ Parser detects COUNT function
+- ✅ Parser detects SUM function
+- ✅ Parser detects AVG function
+- ✅ Parser detects MIN function
+- ✅ Parser detects MAX function
+- ✅ Parser parses COUNT(*) syntax
+- ✅ Parser parses COUNT(column) syntax
+- ✅ Parser parses AS aliases for aggregates
+- ✅ Parser handles multiple aggregates in single query
+- ✅ Executor accepts parsed aggregate information
+- ✅ SQLite handles COUNT correctly
+- ✅ SQLite handles SUM correctly
+- ✅ SQLite handles AVG correctly
+- ✅ SQLite handles MIN correctly
+- ✅ SQLite handles MAX correctly
+- ✅ Multiple aggregates work in single query
+- ✅ Aggregates work with WHERE clause
+- ✅ Server binary compiles successfully
+- ✅ Test client compiles successfully
+- ✅ Changes committed and pushed to GitHub
+
+**Limitations**:
+- Currently relying on SQLite's native aggregate function support
+- This is actually optimal for performance
+- SQLite supports all aggregate functions (COUNT, SUM, AVG, MIN, MAX)
+- Custom aggregate logic could be added for special cases
 - No support yet for GROUP BY/HAVING (Iteration 3)
 - No support yet for JOINs (Iteration 4)
 
