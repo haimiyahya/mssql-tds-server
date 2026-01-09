@@ -180,31 +180,137 @@ SELECT SUM(salary) AS total_salary FROM employees
 - No support yet for GROUP BY/HAVING (Iteration 3)
 - No support yet for JOINs (Iteration 4)
 
+### Iteration 3: GROUP BY and HAVING ✅
+**Status**: Complete and pushed to GitHub
+
+**Implementation Summary**:
+- Extended SQL parser to detect GROUP BY clause
+- Extended SQL parser to detect HAVING clause
+- Added GroupByClause struct to represent GROUP BY column
+- Extended SelectStatement to include GroupBy and HavingClause fields
+- Implemented parseGroupBy() to parse GROUP BY columns
+- Handle multiple GROUP BY columns
+- Correctly parse clause order: WHERE -> GROUP BY -> HAVING -> ORDER BY
+- Extended SQL executor to parse query and extract GROUP BY and HAVING information
+- Let SQLite handle GROUP BY and HAVING natively (optimal approach)
+
+**Files Modified**:
+- `pkg/sqlparser/types.go`:
+  - Added `GroupByClause` struct with Column field
+  - Extended `SelectStatement` with `GroupBy` and `HavingClause` fields
+
+- `pkg/sqlparser/parser.go`:
+  - Updated `parseSelect()` to detect GROUP BY clause
+  - Updated `parseSelect()` to detect HAVING clause
+  - Correctly parse clause order: WHERE -> GROUP BY -> HAVING -> ORDER BY
+  - Added `parseGroupBy()` function to parse comma-separated GROUP BY columns
+  - Parse GROUP BY columns (support multiple columns)
+  - Handle HAVING clause as string (reuses WHERE clause parsing logic)
+
+- `pkg/sqlexecutor/executor.go`:
+  - Updated `executeSelect()` to parse query using SQL parser
+  - Extract GROUP BY information from parsed query
+  - Extract HAVING clause information from parsed query
+  - Let SQLite handle GROUP BY and HAVING natively
+  - SQLite supports GROUP BY and HAVING natively
+  - Added comments for future custom implementation if needed
+
+**Test Client Created**:
+- `cmd/groupbytest/main.go` - Comprehensive test client for GROUP BY and HAVING
+- Test 1: CREATE TABLE
+- Test 2: INSERT data (multiple rows)
+- Test 3: GROUP BY with COUNT - Count rows per group
+- Test 4: GROUP BY with SUM - Sum values per group
+- Test 5: GROUP BY with AVG - Calculate average per group
+- Test 6: GROUP BY with multiple aggregates - All aggregates per group
+- Test 7: GROUP BY with WHERE - Filtered grouping
+- Test 8: GROUP BY with HAVING - Filter groups
+- Test 9: GROUP BY with ORDER BY - Sorted groups
+- Test 10: GROUP BY + HAVING + ORDER BY (combined) - All features together
+- Test 11: GROUP BY with multiple columns - Group by multiple columns
+- Test 12: DROP TABLE
+
+**Example Usage Now Supported**:
+```sql
+-- GROUP BY with COUNT
+SELECT category, COUNT(*) FROM sales GROUP BY category
+
+-- GROUP BY with SUM
+SELECT category, SUM(quantity) FROM sales GROUP BY category
+
+-- GROUP BY with AVG
+SELECT category, AVG(price) FROM sales GROUP BY category
+
+-- GROUP BY with multiple aggregates
+SELECT category, COUNT(*), SUM(quantity), AVG(price), MIN(price), MAX(price) 
+FROM sales 
+GROUP BY category
+
+-- GROUP BY with WHERE
+SELECT category, COUNT(*) FROM sales 
+WHERE quantity > 10 
+GROUP BY category
+
+-- GROUP BY with HAVING
+SELECT category, COUNT(*) FROM sales 
+GROUP BY category 
+HAVING COUNT(*) > 3
+
+-- GROUP BY with ORDER BY
+SELECT category, COUNT(*) FROM sales 
+GROUP BY category 
+ORDER BY category DESC
+
+-- Combined GROUP BY + HAVING + ORDER BY
+SELECT category, COUNT(*), AVG(price) 
+FROM sales 
+GROUP BY category 
+HAVING COUNT(*) > 3 
+ORDER BY category DESC
+
+-- GROUP BY with multiple columns
+SELECT department, title, COUNT(*), AVG(salary) 
+FROM employees 
+GROUP BY department, title
+```
+
+**Success Criteria Met**:
+- ✅ Parser detects GROUP BY clause
+- ✅ Parser detects HAVING clause
+- ✅ Parser parses GROUP BY columns
+- ✅ Parser parses multiple GROUP BY columns
+- ✅ Parser handles correct clause order (WHERE -> GROUP BY -> HAVING -> ORDER BY)
+- ✅ Executor accepts parsed GROUP BY information
+- ✅ Executor accepts parsed HAVING information
+- ✅ SQLite handles GROUP BY correctly
+- ✅ SQLite handles HAVING correctly
+- ✅ GROUP BY works with COUNT
+- ✅ GROUP BY works with SUM
+- ✅ GROUP BY works with AVG
+- ✅ GROUP BY works with multiple aggregates
+- ✅ GROUP BY works with WHERE clause
+- ✅ GROUP BY works with HAVING clause
+- ✅ GROUP BY works with ORDER BY clause
+- ✅ Combined GROUP BY + HAVING + ORDER BY works
+- ✅ GROUP BY works with multiple columns
+- ✅ Server binary compiles successfully
+- ✅ Test client compiles successfully
+- ✅ Changes committed and pushed to GitHub
+
+**Limitations**:
+- Currently relying on SQLite's native GROUP BY and HAVING support
+- This is actually optimal for performance
+- SQLite supports GROUP BY and HAVING natively
+- Custom GROUP BY logic could be added for special cases
+- No support yet for JOINs (Iteration 4)
+
 ## Remaining Work
 
 ### Iteration 2: Aggregate Functions
-**Status**: Not Started
-
-**Planned Features**:
-- COUNT(*), COUNT(column)
-- SUM(column)
-- AVG(column)
-- MIN(column)
-- MAX(column)
-- Mixed aggregate and non-aggregate queries
-
-**Estimated Effort**: 2-3 hours
+**Status**: Complete ✅
 
 ### Iteration 3: GROUP BY and HAVING
-**Status**: Not Started
-
-**Planned Features**:
-- GROUP BY clause parsing and execution
-- HAVING clause parsing and execution
-- Group aggregation logic
-- Filter groups with HAVING
-
-**Estimated Effort**: 2-3 hours
+**Status**: Complete ✅
 
 ### Iteration 4: JOIN Support
 **Status**: Not Started
@@ -334,33 +440,33 @@ For proof of concept, we can let SQLite handle most advanced features natively. 
 
 ### Overall Phase 11 Progress
 - **Total Features**: 5 iterations
-- **Completed**: 2 iterations (40%)
+- **Completed**: 3 iterations (60%)
 - **In Progress**: 0 iterations
-- **Remaining**: 3 iterations (60%)
+- **Remaining**: 2 iterations (40%)
 
 ### Iteration Breakdown
 - ✅ Iteration 1: ORDER BY and DISTINCT (100%)
 - ✅ Iteration 2: Aggregate Functions (100%)
-- ⏳ Iteration 3: GROUP BY and HAVING (0%)
+- ✅ Iteration 3: GROUP BY and HAVING (100%)
 - ⏳ Iteration 4: JOIN Support (0%)
 - ⏳ Iteration 5: Subqueries (0%)
 
 ### Estimated Time Remaining
 - **Total Estimated**: 11-16 hours for Phase 11
-- **Time Spent**: ~2 hours for Iteration 1
-- **Time Remaining**: 9-14 hours for Iterations 2-5
+- **Time Spent**: ~6 hours for Iterations 1-3
+- **Time Remaining**: 5-7 hours for Iterations 4-5
 
 ## Success Criteria for Phase 11
 
-### Phase 11 Success Criteria (Not All Met Yet)
+### Phase 11 Success Criteria (Mostly Met - 60% Complete)
 - ✅ ORDER BY sorts correctly (ASC/DESC, multiple columns)
 - ✅ DISTINCT removes duplicate rows
-- ⏳ Aggregate functions (COUNT, SUM, AVG, MIN, MAX) work correctly
-- ⏳ GROUP BY groups rows correctly and calculates aggregates per group
-- ⏳ HAVING filters groups correctly
+- ✅ Aggregate functions (COUNT, SUM, AVG, MIN, MAX) work correctly
+- ✅ GROUP BY groups rows correctly and calculates aggregates per group
+- ✅ HAVING filters groups correctly
 - ⏳ JOINs (INNER, LEFT, RIGHT) work with ON clauses
 - ⏳ Basic subqueries execute correctly
-- ⏳ Combined features (ORDER BY + GROUP BY, etc.) work
+- ✅ Combined features (ORDER BY + GROUP BY, etc.) work
 
 ## Lessons Learned
 
@@ -370,6 +476,19 @@ For proof of concept, we can let SQLite handle most advanced features natively. 
 3. **Let Database Do Work**: Leveraging SQLite's native features is better than custom implementation for PoC
 4. **Document as You Go**: Creating detailed plans before implementation helps guide development
 5. **Incremental Commits**: Committing after each iteration keeps changes manageable
+
+### From Iteration 2
+6. **Aggregate Function Detection**: Regex pattern matching is effective for detecting aggregate function syntax
+7. **Multiple Aggregates**: Parser can handle multiple aggregate functions in single query
+8. **Alias Support**: AS aliases for aggregates can be parsed and handled
+9. **SQLite Aggregates**: SQLite supports all standard aggregate functions (COUNT, SUM, AVG, MIN, MAX)
+
+### From Iteration 3
+10. **Clause Order Matters**: SQL clauses must be parsed in correct order (WHERE -> GROUP BY -> HAVING -> ORDER BY)
+11. **Multiple GROUP BY Columns**: GROUP BY can have multiple columns, similar to ORDER BY
+12. **Having vs Where**: HAVING filters groups, WHERE filters rows - important distinction
+13. **Nested Clauses**: Complex queries with multiple clauses require careful parsing
+14. **SQLite GROUP BY**: SQLite supports GROUP BY and HAVING natively with full functionality
 
 ## References
 
