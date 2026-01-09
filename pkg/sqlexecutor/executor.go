@@ -150,6 +150,23 @@ func (e *Executor) executeSelect(query string) (*ExecuteResult, error) {
 	// }
 	// For now, SQLite handles all GROUP BY and HAVING calculations
 
+	// Handle JOINs
+	// For Phase 11 Iteration 4, we'll let SQLite handle JOINs
+	// SQLite supports INNER, LEFT, and CROSS JOINs natively
+	// RIGHT JOIN and FULL JOIN are not supported by SQLite directly
+	// Workarounds would be needed for RIGHT and FULL JOINs:
+	// - RIGHT JOIN: Can be emulated by swapping table order and using LEFT JOIN
+	// - FULL JOIN: Can be emulated by combining LEFT JOIN and RIGHT JOIN with UNION
+	// In a more advanced implementation, we would:
+	// if len(stmt.Select.Joins) > 0 {
+	// 	for _, join := range stmt.Select.Joins {
+	// 		if join.Type == "RIGHT" || join.Type == "FULL" {
+	// 			// Implement JOIN workaround
+	// 		}
+	// 	}
+	// }
+	// For now, let SQLite handle all JOINs (will fail on RIGHT and FULL with error)
+
 	return &ExecuteResult{
 		Columns:  columns,
 		Rows:     resultRows,

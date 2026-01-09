@@ -52,7 +52,7 @@ func (p *Parser) Parse(query string) (*Statement, error) {
 // parseSelect parses a SELECT statement
 func (p *Parser) parseSelect(query string) *Statement {
 	// Extract columns and table name
-	// Format: SELECT [DISTINCT] [columns] FROM [table] [WHERE clause] [GROUP BY clause] [HAVING clause] [ORDER BY clause]
+	// Format: SELECT [DISTINCT] [columns] FROM [table] [JOIN ...] [WHERE clause] [GROUP BY clause] [HAVING clause] [ORDER BY clause]
 
 	upperQuery := strings.ToUpper(query)
 
@@ -88,9 +88,10 @@ func (p *Parser) parseSelect(query string) *Statement {
 	var havingClause string
 	var groupByClause []GroupByClause
 	var whereClause string
+	var joins []JoinClause
 	var tableName string
 
-	// Parse ORDER BY first (comes after HAVING or GROUP BY or WHERE or FROM)
+	// Parse ORDER BY first (comes after HAVING or GROUP BY or WHERE or JOINs or FROM)
 	if orderByIndex != -1 {
 		orderByClause = p.parseOrderBy(query[orderByIndex+9:]) // 9 = len(" ORDER BY ")
 		query = strings.TrimSpace(query[:orderByIndex])
@@ -105,7 +106,7 @@ func (p *Parser) parseSelect(query string) *Statement {
 		upperQuery = strings.ToUpper(query)
 	}
 
-	// Find GROUP BY clause (optional) - comes after WHERE
+	// Find GROUP BY clause (optional) - comes after WHERE or JOINs
 	groupByIndex := strings.Index(upperQuery, " GROUP BY ")
 	if groupByIndex != -1 {
 		groupByClause = p.parseGroupBy(query[groupByIndex+9:]) // 9 = len(" GROUP BY ")
@@ -113,20 +114,51 @@ func (p *Parser) parseSelect(query string) *Statement {
 		upperQuery = strings.ToUpper(query)
 	}
 
-	// Find WHERE clause (optional)
+	// Find WHERE clause (optional) - comes after JOINs
 	whereIndex := strings.Index(upperQuery, " WHERE ")
-
 	if whereIndex != -1 {
-		// Extract table name (between FROM and WHERE)
-		tablePart := query[fromIndex+6 : whereIndex] // 6 = len(" FROM ")
-		tableName = strings.TrimSpace(tablePart)
-
-		// Extract WHERE clause
 		whereClause = strings.TrimSpace(query[whereIndex+7:]) // 7 = len(" WHERE ")
-	} else {
-		// No WHERE clause
-		tableName = strings.TrimSpace(query[fromIndex+6:])
+		query = strings.TrimSpace(query[:whereIndex])
+		upperQuery = strings.ToUpper(query)
 	}
+
+	// Parse JOIN clauses (optional) - comes after FROM
+	joins = p.parseJoins(query, upperQuery, fromIndex)
+	// Remove JOINs from query to extract table name
+	// We need to recalculate query after removing JOINs
+	// For now, we'll extract table name from before the first JOIN
+
+	// Extract table name (from FROM to first JOIN or WHERE or end)
+	tableEndIndex := len(query)
+	// Find first JOIN, GROUP BY, HAVING, ORDER BY, or WHERE
+	firstClauseIndex := -1
+
+	joinKeywords := []string{" INNER JOIN ", " LEFT JOIN ", " RIGHT JOIN ", " FULL JOIN ", " JOIN "}
+	for _, keyword := range joinKeywords {
+		if idx := strings.Index(upperQuery, keyword); idx != -1 && (firstClauseIndex == -1 || idx < firstClauseIndex) {
+			firstClauseIndex = idx
+		}
+	}
+
+	if whereIndex != -1 && whereIndex < tableEndIndex {
+		tableEndIndex = whereIndex
+	}
+	if groupByIndex != -1 && groupByIndex < tableEndIndex {
+		tableEndIndex = groupByIndex
+	}
+	if havingIndex != -1 && havingIndex < tableEndIndex {
+		tableEndIndex = havingIndex
+	}
+	if orderByIndex != -1 && orderByIndex < tableEndIndex {
+		tableEndIndex = orderByIndex
+	}
+	if firstClauseIndex != -1 && firstClauseIndex < tableEndIndex {
+		tableEndIndex = firstClauseIndex
+	}
+
+	// Extract table name
+	tablePart := query[fromIndex+6 : tableEndIndex] // 6 = len(" FROM ")
+	tableName = strings.TrimSpace(tablePart)
 
 	// Clean up table name (remove trailing stuff)
 	tableName = p.extractTableName(tableName)
@@ -136,6 +168,7 @@ func (p *Parser) parseSelect(query string) *Statement {
 		Select: &SelectStatement{
 			Columns:          columns,
 			Table:            tableName,
+			Joins:            joins,
 			WhereClause:       whereClause,
 			Distinct:         distinct,
 			OrderBy:           orderByClause,
@@ -204,6 +237,105 @@ func (p *Parser) parseGroupBy(groupByClause string) []GroupByClause {
 	}
 
 	return groupByClauses
+}
+
+// parseJoins parses JOIN clauses from query
+func (p *Parser) parseJoins(query string, upperQuery string, fromIndex int) []JoinClause {
+	// Find all JOINs in the query
+	joins := make([]JoinClause, 0)
+	currentIndex := fromIndex
+
+	for currentIndex < len(query) {
+		// Find next JOIN keyword
+		joinKeywords := []struct {
+			keyword string
+			joinType string
+		}{
+			{" INNER JOIN ", "INNER"},
+			{" LEFT JOIN ", "LEFT"},
+			{" RIGHT JOIN ", "RIGHT"},
+			{" FULL JOIN ", "FULL"},
+			{" JOIN ", "INNER"}, // Default JOIN type is INNER
+		}
+
+		bestIndex := -1
+		bestType := ""
+		bestKeyword := ""
+
+		for _, jk := range joinKeywords {
+			idx := strings.Index(upperQuery[currentIndex:], jk.keyword)
+			if idx != -1 && (bestIndex == -1 || idx < bestIndex) {
+				bestIndex = idx + currentIndex
+				bestType = jk.joinType
+				bestKeyword = jk.keyword
+			}
+		}
+
+		if bestIndex == -1 {
+			// No more JOINs found
+			break
+		}
+
+		// Extract JOIN part (from JOIN keyword to next clause or end)
+		joinStart := bestIndex + len(bestKeyword)
+		joinPart := query[joinStart:]
+
+		// Find ON keyword
+		onIndex := strings.Index(strings.ToUpper(joinPart), " ON ")
+		if onIndex == -1 {
+			// Invalid JOIN syntax, skip
+			currentIndex = bestIndex + len(bestKeyword)
+			continue
+		}
+
+		// Extract table name (from JOIN to ON)
+		tablePart := strings.TrimSpace(joinPart[:onIndex])
+
+		// Check for AS alias
+		var alias string
+		aliasIndex := strings.Index(strings.ToUpper(tablePart), " AS ")
+		if aliasIndex != -1 {
+			alias = strings.TrimSpace(tablePart[aliasIndex+4:])
+			tablePart = strings.TrimSpace(tablePart[:aliasIndex])
+		}
+
+		// Extract ON clause (from ON to next clause or end)
+		onClausePart := joinPart[onIndex+4:] // 4 = len(" ON ")
+
+		// Find where this ON clause ends (next JOIN, WHERE, GROUP BY, HAVING, ORDER BY)
+		onEndKeywords := []string{" INNER JOIN ", " LEFT JOIN ", " RIGHT JOIN ", " FULL JOIN ", " JOIN ", " WHERE ", " GROUP BY ", " HAVING ", " ORDER BY "}
+		onEndIndex := -1
+
+		for _, keyword := range onEndKeywords {
+			idx := strings.Index(strings.ToUpper(onClausePart), keyword)
+			if idx != -1 && (onEndIndex == -1 || idx < onEndIndex) {
+				onEndIndex = idx
+			}
+		}
+
+		if onEndIndex != -1 {
+			onClause := strings.TrimSpace(onClausePart[:onEndIndex])
+			joins = append(joins, JoinClause{
+				Type:     bestType,
+				Table:    tablePart,
+				OnClause: onClause,
+				Alias:    alias,
+			})
+			currentIndex = joinStart + onEndIndex
+		} else {
+			// ON clause goes to end of query
+			onClause := strings.TrimSpace(onClausePart)
+			joins = append(joins, JoinClause{
+				Type:     bestType,
+				Table:    tablePart,
+				OnClause: onClause,
+				Alias:    alias,
+			})
+			break
+		}
+	}
+
+	return joins
 }
 
 // parseAggregates parses aggregate functions from column list

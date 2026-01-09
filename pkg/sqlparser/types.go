@@ -37,6 +37,7 @@ func (st StatementType) String() string {
 type SelectStatement struct {
 	Columns           []string
 	Table             string
+	Joins             []JoinClause
 	WhereClause        string
 	Distinct          bool
 	OrderBy           []OrderByClause
@@ -55,6 +56,14 @@ type OrderByClause struct {
 // GroupByClause represents a GROUP BY clause
 type GroupByClause struct {
 	Column string
+}
+
+// JoinClause represents a JOIN clause
+type JoinClause struct {
+	Type      string // "INNER", "LEFT", "RIGHT", "FULL"
+	Table     string
+	OnClause  string
+	Alias     string // Optional table alias
 }
 
 // AggregateFunction represents an aggregate function
