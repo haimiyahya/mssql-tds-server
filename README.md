@@ -4,7 +4,7 @@ A fully-featured Microsoft SQL Server-compatible server implementing the TDS (Ta
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Phase Status](https://img.shields.io/badge/Phase-23%20Complete-green.svg)]()
+[![Phase Status](https://img.shields.io/badge/Phase-39%20Complete-brightgreen.svg)](PHASE39_PROGRESS.md)
 
 ## Table of Contents
 
@@ -45,14 +45,15 @@ The MSSQL TDS Server is a high-performance, fully-featured database server that 
 
 **Project Status**: ✅ Production Ready
 
-**Latest Phase**: Phase 23 - Security Enhancements (COMPLETE)
+**Latest Phase**: Phase 39 - Database Administration UI (COMPLETE)
 
-**Progress**: 23 of 23 planned phases complete (100%)
+**Progress**: 39 of 39 planned phases complete (100%)
 
 **Last Update**: 2024
 
-### Completed Phases (23/23)
+### Completed Phases (39/39)
 
+**Core Phases (1-24)**
 - ✅ Phase 1: Basic SQL Parser and Executor
 - ✅ Phase 2: TDS Protocol Implementation
 - ✅ Phase 3: Connection Handling
@@ -76,8 +77,24 @@ The MSSQL TDS Server is a high-performance, fully-featured database server that 
 - ✅ Phase 21: Error Handling Improvements
 - ✅ Phase 22: Performance Monitoring
 - ✅ Phase 23: Security Enhancements
+- ✅ Phase 24: Documentation and README Update
 
-## Features
+**Advanced Features Phases (25-39)**
+- ✅ Phase 25: EXPLAIN Query Plan Analysis
+- ✅ Phase 26: Full-Text Search (FTS)
+- ✅ Phase 27: Common Table Expressions (CTE)
+- ✅ Phase 28: Window Functions
+- ✅ Phase 29: Triggers
+- ✅ Phase 30: JSON Functions
+- ✅ Phase 31: Advanced Date/Time Functions
+- ✅ Phase 32: Geospatial Functions
+- ✅ Phase 33: User-Defined Functions (UDF)
+- ✅ Phase 34: Database Backup and Restore
+- ✅ Phase 35: Data Import/Export
+- ✅ Phase 36: Migration Tools
+- ✅ Phase 37: Performance Optimization
+- ✅ Phase 38: Monitoring and Alerting
+- ✅ Phase 39: Database Administration UI## Features
 
 ### Core SQL Operations
 
@@ -184,57 +201,225 @@ The MSSQL TDS Server is a high-performance, fully-featured database server that 
 - Error categorization
 - Detailed error information
 
-**Security**
+\*\*Security\*\*
 - SQL injection prevention
 - Parameterized queries
 - Query sanitization
 - Data validation
 - Authentication and authorization support
 
+**JSON Functions**
+- `JSON_EXTRACT` - Extract values from JSON
+- `JSON_OBJECT` - Create JSON object
+- `JSON_ARRAY` - Create JSON array
+- `JSON_SET` - Set value in JSON
+- `JSON_INSERT` - Insert value in JSON
+- `JSON_REPLACE` - Replace value in JSON
+- `JSON_PATCH` - Merge JSON objects
+- `JSON_VALID` - Validate JSON
+- `JSON_EACH` - Iterate JSON elements
+- `JSON_TREE` - Traverse JSON structure
+- `JSON_GROUP_ARRAY` - Aggregate to JSON array
+- `JSON_GROUP_OBJECT` - Aggregate to JSON object
+
+**Window Functions**
+- `OVER` - Window function clause
+- `PARTITION BY` - Partition window by columns
+- `ORDER BY` - Order window by columns
+- `ROW_NUMBER` - Row number in partition
+- `RANK` - Rank in partition
+- `DENSE_RANK` - Dense rank in partition
+- `NTILE` - Distribute rows into buckets
+- `LEAD` - Access next row
+- `LAG` - Access previous row
+- `FIRST_VALUE` - First value in partition
+- `LAST_VALUE` - Last value in partition
+- Frame clauses (ROWS, RANGE, GROUPS)
+
+**Common Table Expressions (CTE)**
+- `WITH` - Define CTE
+- Recursive CTEs
+- Multiple CTEs
+- CTE in INSERT/UPDATE/DELETE
+- CTE nesting
+- CTE materialization
+
+**Full-Text Search (FTS)**
+- FTS5 virtual tables
+- `MATCH` - Full-text search
+- `BM25` - Relevance scoring
+- Snippets and highlighting
+- FTS indexing
+- Query expansion
+- FTS configuration
+
+**Geospatial Functions**
+- `HAVERSINE_DISTANCE` - Calculate distance between points
+- `POINT_IN_POLYGON` - Check if point is in polygon
+- `BOUNDING_BOX` - Calculate bounding box
+- `DISTANCE_SPHERICAL` - Spherical distance calculation
+- `DISTANCE_CIRCULAR` - Circular distance calculation
+- `CENTROID` - Calculate polygon centroid
+- `POLYGON_AREA` - Calculate polygon area
+- Geospatial queries
+- Spatial joins
+- Spatial indexing
+
+**Advanced Date/Time Functions**
+- `DATE` - Extract date from datetime
+- `TIME` - Extract time from datetime
+- `DATETIME` - Create datetime
+- `STRFTIME` - Format datetime
+- Date arithmetic
+- Date/time modifiers
+- Julian day functions
+- Timezone handling
+- Date comparisons
+- Age calculations
+- Business days calculations
+
+**User-Defined Functions (UDF)**
+- Custom scalar functions
+- Custom aggregate functions
+- Mathematical UDFs
+- String UDFs
+- Date/Time UDFs
+- Conditional UDFs
+- Array/List UDFs
+- Validation UDFs
+- Business logic UDFs
+- Data transformation UDFs
+- Complex calculation UDFs
+
+**Triggers**
+- `CREATE TRIGGER` - Create trigger
+- `DROP TRIGGER` - Drop trigger
+- `BEFORE` triggers
+- `AFTER` triggers
+- `FOR EACH ROW` triggers
+- `INSERT`, `UPDATE`, `DELETE` triggers
+- `OLD` and `NEW` references
+- `WHEN` condition
+- Trigger error handling
+
+**EXPLAIN Query Plan Analysis**
+- `EXPLAIN` - Display query plan
+- Query optimization
+- Index usage analysis
+- Join optimization
+- Scan methods
+- Plan statistics
+- Performance recommendations
+
+**Database Backup and Restore**
+- Full backup
+- Incremental backup
+- Point-in-time recovery
+- Backup validation
+- Restore validation
+- Backup encryption
+- Backup compression
+- Automated backup
+- Backup rotation
+
+**Data Import/Export**
+- CSV import/export
+- JSON import/export
+- Bulk data operations
+- Data format validation
+- Progress tracking
+- Batch processing
+- Data transformation
+
+**Migration Tools**
+- Schema migration
+- Data migration
+- Version control
+- Migration rollback
+- Migration validation
+- Migration history tracking
+- Migration execution
+
+**Performance Optimization**
+- Query optimization
+- Index optimization
+- Connection pool optimization
+- Memory optimization
+- Query performance monitoring
+- Performance metrics
+- Performance tuning recommendations
+- Query caching
+- Connection monitoring
+- Throughput measurement
+- Latency measurement
+
+**Monitoring and Alerting**
+- Real-time monitoring
+- Alert configuration
+- Notification channels
+- Health checks
+- System metrics
+- Alert history tracking
+- Log aggregation
+- Alert rules
+- Alert resolution
+- Monitoring dashboard
+
+**Database Administration UI**
+- Web-based admin interface
+- Table management UI
+- Query editor UI
+- User management UI
+- Database configuration
+- Data visualization
+- System monitoring dashboard
+- Query history UI
+- Database statistics UI
+- Backup/restore UI
+
 ## Architecture
 
 ### System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     MSSQL Clients                        │
-│  (ADO.NET, JDBC, ODBC, pymssql, go-mssqldb, etc.)   │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ TDS Protocol (TCP/IP)
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  TDS Protocol Layer                      │
-│  - Packet parsing and assembly                           │
-│  - Login authentication                                  │
-│  - Command routing (SQL_BATCH, RPC)                    │
-│  - Result set formatting                                 │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 SQL Parser Layer                          │
-│  - SQL statement parsing                                │
-│  - Syntax validation                                    │
-│  - Query optimization hints                              │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                SQL Executor Layer                         │
-│  - Statement execution                                  │
-│  - Transaction management                               │
-│  - Connection pooling                                   │
-│  - Performance monitoring                               │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                SQLite Storage Layer                       │
-│  - Data persistence                                    │
-│  - Index management                                     │
-│  - Constraint validation                                │
-│  - Transaction support                                  │
-└─────────────────────────────────────────────────────────────┘
+.
+├── PLAN.md                                   # Detailed project plan
+├── README.md                                 # This file
+├── PHASE01-39_PROGRESS.md               # Phase progress documents
+├── go.mod                                    # Go module definition
+├── pkg/                                      # Package libraries
+│   ├── sqlparser/                           # SQL statement parser
+│   ├── sqlexecutor/                         # SQL statement executor
+│   ├── sqlite/                              # SQLite database management
+│   ├── tds/                                 # TDS protocol implementation
+│   └── ...                                  # Other support packages
+└── cmd/                                      # Server and client applications
+    ├── server/                              # TDS server implementation
+    ├── client/                              # Test client using standard mssql driver
+    └── *test/                               # Phase-specific test clients
+        ├── selecttest/                       # Advanced SELECT tests
+        ├── jointest/                        # JOIN operation tests
+        ├── constrainttest/                  # Constraint tests
+        ├── functiontest/                   # SQL function tests
+        ├── batchtest/                      # Batch operation tests
+        ├── pooltest/                       # Connection pool tests
+        ├── errortest/                      # Error handling tests
+        ├── perftest/                       # Performance monitoring tests
+        ├── securitytest/                   # Security validation tests
+        ├── explainftstest/                 # EXPLAIN query plan tests
+        ├── ftstest/                        # Full-text search tests
+        ├── ctetest/                        # CTE tests
+        ├── windowtest/                     # Window function tests
+        ├── triggertest/                    # Trigger tests
+        ├── jsontest/                       # JSON function tests
+        ├── datetimetest/                   # Date/time function tests
+        ├── geospatialtest/                 # Geospatial function tests
+        ├── udftest/                        # UDF tests
+        ├── backuptest/                     # Backup/restore tests
+        ├── importexporttest/               # Import/export tests
+        ├── migrationtest/                  # Migration tools tests
+        ├── monitoringtest/                 # Monitoring/alerting tests
+        └── admintest/                     # Admin UI tests
 ```
 
 ### Project Structure
@@ -549,17 +734,44 @@ The project includes comprehensive test clients for each phase:
 
 ```bash
 # Build all test clients
-for test in selecttest jointest constrainttest functiontest batchtest pooltest errortest perftest securitytest; do
+for test in selecttest jointest constrainttest functiontest batchtest pooltest errortest perftest securitytest explainftstest ctetest windowtest triggertest jsontest datetimetest geospatialtest udftest backuptest importexporttest migrationtest monitoringtest admintest; do
     go build -o bin/$test cmd/$test/main.go
 done
 
 # Run tests (requires running server)
-for test in selecttest jointest constrainttest functiontest batchtest pooltest errortest perftest securitytest; do
+for test in selecttest jointest constrainttest functiontest batchtest pooltest errortest perftest securitytest explainftstest ctetest windowtest triggertest jsontest datetimetest geospatialtest udftest backuptest importexporttest migrationtest monitoringtest admintest; do
     ./bin/$test
 done
 ```
 
-## Documentation
+### Test Clients
+
+**Core Tests (1-23)**
+- `selecttest` - Advanced SELECT features
+- `jointest` - JOIN operations
+- `constrainttest` - Constraints
+- `functiontest` - SQL functions
+- `batchtest` - Batch operations
+- `pooltest` - Connection pooling
+- `errortest` - Error handling
+- `perftest` - Performance monitoring
+- `securitytest` - Security validation
+
+**Advanced Tests (24-39)**
+- `explainftstest` - EXPLAIN query plans
+- `ftstest` - Full-text search
+- `ctetest` - Common table expressions
+- `windowtest` - Window functions
+- `triggertest` - Triggers
+- `jsontest` - JSON functions
+- `datetimetest` - Date/time functions
+- `geospatialtest` - Geospatial functions
+- `udftest` - User-defined functions
+- `backupresttest` - Database backup and restore
+- `importexporttest` - Data import/export
+- `migrationtest` - Migration tools
+- `monitoringtest` - Monitoring and alerting
+- `admintest` - Database administration UI## Documentation
 
 - [PLAN.md](PLAN.md) - Overall project plan and roadmap
 - [PHASE01-23_PROGRESS.md](PHASE01-23_PROGRESS.md) - Detailed progress for each phase
