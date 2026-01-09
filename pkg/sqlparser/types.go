@@ -11,6 +11,9 @@ const (
 	StatementTypeDelete
 	StatementTypeCreateTable
 	StatementTypeDropTable
+	StatementTypeBeginTransaction
+	StatementTypeCommit
+	StatementTypeRollback
 )
 
 // String returns the string representation of StatementType
@@ -28,6 +31,12 @@ func (st StatementType) String() string {
 		return "CREATE TABLE"
 	case StatementTypeDropTable:
 		return "DROP TABLE"
+	case StatementTypeBeginTransaction:
+		return "BEGIN TRANSACTION"
+	case StatementTypeCommit:
+		return "COMMIT"
+	case StatementTypeRollback:
+		return "ROLLBACK"
 	default:
 		return "UNKNOWN"
 	}
@@ -105,6 +114,22 @@ type DropTableStatement struct {
 	TableName string
 }
 
+// BeginTransactionStatement represents a BEGIN TRANSACTION statement
+type BeginTransactionStatement struct {
+	Name string // Optional transaction name (for named transactions)
+}
+
+// CommitStatement represents a COMMIT statement
+type CommitStatement struct {
+	Name string // Optional transaction name (for named transactions)
+}
+
+// RollbackStatement represents a ROLLBACK statement
+type RollbackStatement struct {
+	Name         string // Optional transaction name (for named transactions)
+	SavepointName string // Optional savepoint name for ROLLBACK TO SAVEPOINT
+}
+
 // ColumnDefinition represents a column definition in CREATE TABLE
 type ColumnDefinition struct {
 	Name string
@@ -115,11 +140,14 @@ type ColumnDefinition struct {
 type Statement struct {
 	Type StatementType
 
-	Select       *SelectStatement
-	Insert       *InsertStatement
-	Update       *UpdateStatement
-	Delete       *DeleteStatement
-	CreateTable  *CreateTableStatement
-	DropTable    *DropTableStatement
-	RawQuery     string
+	Select                 *SelectStatement
+	Insert                 *InsertStatement
+	Update                 *UpdateStatement
+	Delete                 *DeleteStatement
+	CreateTable            *CreateTableStatement
+	DropTable              *DropTableStatement
+	BeginTransaction       *BeginTransactionStatement
+	Commit                *CommitStatement
+	Rollback              *RollbackStatement
+	RawQuery               string
 }

@@ -58,6 +58,15 @@ func (e *Executor) Execute(query string) (*ExecuteResult, error) {
 	case sqlparser.StatementTypeDropTable:
 		return e.executeDropTable(query)
 
+	case sqlparser.StatementTypeBeginTransaction:
+		return e.executeBeginTransaction(query)
+
+	case sqlparser.StatementTypeCommit:
+		return e.executeCommit(query)
+
+	case sqlparser.StatementTypeRollback:
+		return e.executeRollback(query)
+
 	default:
 		// Try to execute as raw SQL (for unsupported statements)
 		return e.executeRaw(query)
@@ -272,6 +281,51 @@ func (e *Executor) executeDropTable(query string) (*ExecuteResult, error) {
 		RowCount: 0,
 		IsQuery:  false,
 		Message:  "Table dropped successfully",
+	}, nil
+}
+
+// executeBeginTransaction executes a BEGIN TRANSACTION statement
+func (e *Executor) executeBeginTransaction(query string) (*ExecuteResult, error) {
+	// Begin a transaction
+	_, err := e.db.Exec(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	return &ExecuteResult{
+		RowCount: 0,
+		IsQuery:  false,
+		Message:  "Transaction started successfully",
+	}, nil
+}
+
+// executeCommit executes a COMMIT statement
+func (e *Executor) executeCommit(query string) (*ExecuteResult, error) {
+	// Commit the transaction
+	_, err := e.db.Exec(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return &ExecuteResult{
+		RowCount: 0,
+		IsQuery:  false,
+		Message:  "Transaction committed successfully",
+	}, nil
+}
+
+// executeRollback executes a ROLLBACK statement
+func (e *Executor) executeRollback(query string) (*ExecuteResult, error) {
+	// Rollback the transaction
+	_, err := e.db.Exec(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to rollback transaction: %w", err)
+	}
+
+	return &ExecuteResult{
+		RowCount: 0,
+		IsQuery:  false,
+		Message:  "Transaction rolled back successfully",
 	}, nil
 }
 

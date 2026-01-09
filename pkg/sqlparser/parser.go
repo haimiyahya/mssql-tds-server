@@ -38,6 +38,12 @@ func (p *Parser) Parse(query string) (*Statement, error) {
 		stmt = p.parseCreateTable(query)
 	} else if strings.HasPrefix(upperQuery, "DROP TABLE ") {
 		stmt = p.parseDropTable(query)
+	} else if strings.HasPrefix(upperQuery, "BEGIN TRANSACTION") || strings.HasPrefix(upperQuery, "BEGIN") || strings.HasPrefix(upperQuery, "START TRANSACTION") {
+		stmt = p.parseBeginTransaction(query)
+	} else if strings.HasPrefix(upperQuery, "COMMIT") || strings.HasPrefix(upperQuery, "COMMIT TRAN") {
+		stmt = p.parseCommit(query)
+	} else if strings.HasPrefix(upperQuery, "ROLLBACK") || strings.HasPrefix(upperQuery, "ROLLBACK TRAN") {
+		stmt = p.parseRollback(query)
 	} else {
 		// Unknown statement type
 		stmt = &Statement{
@@ -641,6 +647,110 @@ func (p *Parser) parseDropTable(query string) *Statement {
 	}
 }
 
+// parseBeginTransaction parses a BEGIN TRANSACTION statement
+func (p *Parser) parseBeginTransaction(query string) *Statement {
+	// Format: BEGIN TRANSACTION [name]
+	// Format: BEGIN [name]
+	// Format: START TRANSACTION [name]
+
+	upperQuery := strings.ToUpper(query)
+
+	// Remove "BEGIN TRANSACTION", "BEGIN", or "START TRANSACTION"
+	query = strings.TrimPrefix(query, "BEGIN TRANSACTION ")
+	query = strings.TrimPrefix(query, "BEGIN ")
+	query = strings.TrimPrefix(query, "START TRANSACTION ")
+	upperQuery = strings.TrimPrefix(upperQuery, "BEGIN TRANSACTION ")
+	upperQuery = strings.TrimPrefix(upperQuery, "BEGIN ")
+	upperQuery = strings.TrimPrefix(upperQuery, "START TRANSACTION ")
+
+	// Extract transaction name (optional)
+	transactionName := strings.TrimSpace(query)
+	if upperQuery != "" {
+		transactionName = strings.TrimSpace(upperQuery)
+	}
+
+	return &Statement{
+		Type: StatementTypeBeginTransaction,
+		BeginTransaction: &BeginTransactionStatement{
+			Name: transactionName,
+		},
+		RawQuery: query,
+	}
+}
+
+// parseCommit parses a COMMIT statement
+func (p *Parser) parseCommit(query string) *Statement {
+	// Format: COMMIT [name]
+	// Format: COMMIT TRAN [name]
+
+	upperQuery := strings.ToUpper(query)
+
+	// Remove "COMMIT" or "COMMIT TRAN"
+	query = strings.TrimPrefix(query, "COMMIT ")
+	query = strings.TrimPrefix(query, "COMMIT TRAN ")
+	upperQuery = strings.TrimPrefix(upperQuery, "COMMIT ")
+	upperQuery = strings.TrimPrefix(upperQuery, "COMMIT TRAN ")
+
+	// Extract transaction name (optional)
+	transactionName := strings.TrimSpace(query)
+	if upperQuery != "" {
+		transactionName = strings.TrimSpace(upperQuery)
+	}
+
+	return &Statement{
+		Type: StatementTypeCommit,
+		Commit: &CommitStatement{
+			Name: transactionName,
+		},
+		RawQuery: query,
+	}
+}
+
+// parseRollback parses a ROLLBACK statement
+func (p *Parser) parseRollback(query string) *Statement {
+	// Format: ROLLBACK [name]
+	// Format: ROLLBACK TRAN [name]
+	// Format: ROLLBACK TO SAVEPOINT savepoint_name
+
+	upperQuery := strings.ToUpper(query)
+
+	// Check for "ROLLBACK TO SAVEPOINT"
+	toSavepointIndex := strings.Index(upperQuery, " TO SAVEPOINT ")
+
+	if toSavepointIndex != -1 {
+		// ROLLBACK TO SAVEPOINT savepoint_name
+		savepointName := strings.TrimSpace(query[toSavepointIndex+15:]) // 15 = len(" TO SAVEPOINT ")
+
+		return &Statement{
+			Type: StatementTypeRollback,
+			Rollback: &RollbackStatement{
+				SavepointName: savepointName,
+			},
+			RawQuery: query,
+		}
+	}
+
+	// Remove "ROLLBACK" or "ROLLBACK TRAN"
+	query = strings.TrimPrefix(query, "ROLLBACK ")
+	query = strings.TrimPrefix(query, "ROLLBACK TRAN ")
+	upperQuery = strings.TrimPrefix(upperQuery, "ROLLBACK ")
+	upperQuery = strings.TrimPrefix(upperQuery, "ROLLBACK TRAN ")
+
+	// Extract transaction name (optional)
+	transactionName := strings.TrimSpace(query)
+	if upperQuery != "" {
+		transactionName = strings.TrimSpace(upperQuery)
+	}
+
+	return &Statement{
+		Type: StatementTypeRollback,
+		Rollback: &RollbackStatement{
+			Name: transactionName,
+		},
+		RawQuery: query,
+	}
+}
+
 // parseColumns parses a comma-separated list of columns
 func (p *Parser) parseColumns(columnsStr string) []string {
 	columnsStr = strings.TrimSpace(columnsStr)
@@ -794,7 +904,7 @@ func ParseStatementType(query string) StatementType {
 
 // IsStatementTypeSupported checks if a statement type is supported
 func IsStatementTypeSupported(stmtType StatementType) bool {
-	return stmtType >= StatementTypeSelect && stmtType <= StatementTypeDropTable
+	return stmtType >= StatementTypeSelect && stmtType <= StatementTypeRollback
 }
 
 // ExtractTableName extracts table name from various statement types
