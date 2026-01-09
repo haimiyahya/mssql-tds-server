@@ -17,6 +17,7 @@ const (
 	StatementSelectAssignment
 	StatementIF
 	StatementELSE
+	StatementWHILE
 	StatementEND
 )
 
@@ -28,6 +29,11 @@ func ParseStatement(sql string) StatementType {
 	// Check for IF
 	if strings.HasPrefix(sqlUpper, "IF") {
 		return StatementIF
+	}
+
+	// Check for WHILE
+	if strings.HasPrefix(sqlUpper, "WHILE") {
+		return StatementWHILE
 	}
 
 	// Check for DECLARE
@@ -185,14 +191,96 @@ func findELSEInBody(body string) int {
 	return -1
 }
 
+// ParseWHILEBlock parses a WHILE statement block
+// Format: WHILE condition statements END
+func ParseWHILEBlock(sql string) (*Block, error) {
+	sql = strings.TrimSpace(sql)
+	sqlUpper := strings.ToUpper(sql)
+
+	// Must start with WHILE
+	if !strings.HasPrefix(sqlUpper, "WHILE") {
+		return nil, fmt.Errorf("not a WHILE block")
+	}
+
+	// Find statements after WHILE keyword
+	afterWHILE := strings.TrimSpace(sql[5:])
+
+	// Find END keyword (outermost)
+	endPos := findOutermostEND(afterWHILE)
+	if endPos < 0 {
+		return nil, fmt.Errorf("WHILE block missing END keyword")
+	}
+
+	bodyStr := strings.TrimSpace(afterWHILE[:endPos])
+
+	// Parse condition from beginning of body
+	// Format: condition statements...
+	// We need to split condition from statements
+	// For simplicity, assume first part is condition until we see a statement keyword
+	conditionStr := extractConditionFromBody(bodyStr)
+	body := bodyStr[len(conditionStr):]
+
+	// Parse condition
+	condition, err := ParseCondition(conditionStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse WHILE condition: %w", err)
+	}
+
+	return &Block{
+		Type:     BlockWhile,
+		Condition: condition,
+		Body:     []string{body},
+	}, nil
+}
+
+// extractConditionFromBody extracts condition from WHILE body
+// Format: condition statements...
+func extractConditionFromBody(body string) string {
+	// Simple approach: find first keyword that indicates start of statements
+	// Keywords: SELECT, INSERT, UPDATE, DELETE, IF, WHILE, DECLARE, SET, PRINT
+	body = strings.TrimSpace(body)
+	bodyUpper := strings.ToUpper(body)
+
+	// Check if body starts with a keyword
+	keywords := []string{"SELECT ", "INSERT ", "UPDATE ", "DELETE ", "IF ", "WHILE ", "DECLARE ", "SET ", "PRINT ", "BREAK", "CONTINUE"}
+
+	for _, keyword := range keywords {
+		if strings.HasPrefix(bodyUpper, keyword) {
+			// Keyword found at start, condition is empty
+			return ""
+		}
+	}
+
+	// For simple WHILE loops, the condition is usually a single expression
+	// We can parse it by finding the first statement keyword
+	// But this is complex without a full SQL parser
+
+	// Simple heuristic: split by first statement keyword
+	for i := 0; i < len(body); i++ {
+		checkUpper := strings.ToUpper(body[i:])
+		for _, keyword := range keywords {
+			if strings.HasPrefix(checkUpper, keyword) {
+				return strings.TrimSpace(body[:i])
+			}
+		}
+	}
+
+	// No keyword found, entire body is condition
+	return ""
+}
+
+// BlockWhile represents a WHILE block type
+const BlockWhile BlockType = 5
+
 // SplitStatements splits procedure body into individual statements
-// Handles semicolon, IF blocks, etc.
+// Handles semicolon, IF blocks, WHILE blocks, etc.
 func SplitStatements(body string) ([]string, error) {
 	statements := []string{}
 	current := ""
 	inQuotes := false
 	inParentheses := 0
 	inIFBlock := 0
+	inWHILEBlock := 0
 
 	for _, ch := range body {
 		switch ch {
@@ -210,7 +298,7 @@ func SplitStatements(body string) ([]string, error) {
 			}
 			current += string(ch)
 		case ';':
-			if !inQuotes && inParentheses == 0 && inIFBlock == 0 {
+			if !inQuotes && inParentheses == 0 && inIFBlock == 0 && inWHILEBlock == 0 {
 				// End of statement
 				stmt := strings.TrimSpace(current)
 				if stmt != "" {
@@ -221,7 +309,7 @@ func SplitStatements(body string) ([]string, error) {
 				current += string(ch)
 			}
 		case ' ', '\t', '\n', '\r':
-			// Track IF/END keywords
+			// Track IF/WHILE/END keywords
 			currentUpper := strings.ToUpper(current)
 			if strings.HasSuffix(currentUpper, "IF") {
 				// Check if it's IF (not part of another word)
@@ -229,11 +317,20 @@ func SplitStatements(body string) ([]string, error) {
 					inIFBlock++
 				}
 			}
+			if strings.HasSuffix(currentUpper, "WHILE") {
+				// Check if it's WHILE (not part of another word)
+				if len(current) == 5 || (len(current) > 5 && (current[len(current)-6] == ' ' || current[len(current)-6] == '(')) {
+					inWHILEBlock++
+				}
+			}
 			if strings.HasSuffix(currentUpper, "END") {
 				// Check if it's END (not part of another word)
 				if len(current) == 3 || (len(current) > 3 && (current[len(current)-4] == ' ' || current[len(current)-4] == ';')) {
 					if inIFBlock > 0 {
 						inIFBlock--
+					}
+					if inWHILEBlock > 0 {
+						inWHILEBlock--
 					}
 				}
 			}

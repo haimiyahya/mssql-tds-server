@@ -3,7 +3,7 @@
 A Microsoft SQL Server-compatible server implementing the TDS (Tabular Data Stream) protocol with SQLite storage backend.
 
 ## Status
-Proof of Concept - Phase 1, 2, 3, 4, 5 & 6
+Proof of Concept - Phase 1, 2, 3, 4, 5, 6 & 7
 
 ## Overview
 This project implements a minimal TDS server that can accept connections from standard Go mssql clients and handle basic request/response communication, including stored procedure support.
@@ -29,7 +29,8 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
     ├── rpctest/      # RPC procedure test client
     ├── proctest/      # Procedure test client
     ├── vartest/       # Variable test client
-    └── controltest/  # Control flow test client
+    ├── controltest/  # Control flow test client
+    └── whiletest/    # WHILE loop test client
 ```
 
 ## Completed Phases
@@ -86,6 +87,14 @@ See [PLAN.md](PLAN.md) for detailed project phases and implementation strategy.
 - Conditional block execution
 - Error handling for invalid conditions
 
+### Phase 7: WHILE Loops ✅
+- WHILE statement parsing (WHILE condition statements END)
+- Loop condition evaluation with variables
+- Loop body execution
+- Maximum iteration protection (1000 iterations)
+- Support for BREAK/CONTINUE (basic)
+- Error handling for infinite loops
+
 **Example Usage:**
 ```sql
 -- Simple procedure (Phase 4)
@@ -110,6 +119,15 @@ AS
     ELSE
         SELECT 'User is inactive' as message
 
+-- Procedure with WHILE loop (Phase 7)
+CREATE PROCEDURE CountToTen AS
+    DECLARE @i INT
+    SET @i = 1
+
+    WHILE @i <= 10
+        SELECT @i as number
+        SET @i = @i + 1
+
 -- Execute procedure
 EXEC GetUserById @id=1
 
@@ -124,7 +142,6 @@ See [PLAN.md](PLAN.md) for implementation phases and tasks.
 This project provides the foundation for a full-featured MSSQL-compatible server. Future phases will be implemented progressively:
 
 
-- **Phase 7**: WHILE Loops
 - **Phase 8**: Temporary Tables (#temp)
 - **Phase 9**: Transaction Management (BEGIN TRAN, COMMIT, ROLLBACK)
 

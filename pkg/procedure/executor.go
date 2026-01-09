@@ -148,6 +148,9 @@ func (e *Executor) executeStatement(stmt string, paramValues map[string]interfac
 	case controlflow.StatementIF:
 		return e.executeIF(stmt, paramValues, ctx)
 
+	case controlflow.StatementWHILE:
+		return e.executeWHILE(stmt, paramValues, ctx)
+
 	case controlflow.StatementQuery:
 		return e.executeQuery(stmt, paramValues, ctx)
 
@@ -384,6 +387,58 @@ func (e *Executor) readResults(rows *sql.Rows) ([][]string, error) {
 	// Check for errors
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	return results, nil
+}
+
+// executeWHILE handles WHILE loops
+func (e *Executor) executeWHILE(stmt string, paramValues map[string]interface{}, ctx *variable.Context) ([][]string, error) {
+	// Parse WHILE block
+	block, err := controlflow.ParseWHILEBlock(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Maximum iterations to prevent infinite loops
+	maxIterations := 1000
+	iterations := 0
+
+	var results [][]string
+
+	// Loop while condition is true
+	for iterations < maxIterations {
+		// Get all variables from context
+		variables := ctx.GetAll()
+
+		// Evaluate condition
+		conditionResult, err := controlflow.Evaluate(block.Condition, variables)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate WHILE condition: %w", err)
+		}
+
+		// Check if condition is false
+		if !conditionResult {
+			break
+		}
+
+		// Execute WHILE body
+		bodyResults, err := e.executeBlock(block.Body[0], paramValues, ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Collect results (non-nil results indicate a result set)
+		if bodyResults != nil && len(bodyResults) > 0 {
+			results = bodyResults
+		}
+
+		iterations++
+	}
+
+	// Check for infinite loop
+	if iterations >= maxIterations {
+		return nil, fmt.Errorf("WHILE loop exceeded maximum iterations (%d)", maxIterations)
 	}
 
 	return results, nil
