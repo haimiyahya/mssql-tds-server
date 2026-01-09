@@ -38,6 +38,10 @@ func (p *Parser) Parse(query string) (*Statement, error) {
 		stmt = p.parseCreateTable(query)
 	} else if strings.HasPrefix(upperQuery, "DROP TABLE ") {
 		stmt = p.parseDropTable(query)
+	} else if strings.HasPrefix(upperQuery, "CREATE VIEW ") {
+		stmt = p.parseCreateView(query)
+	} else if strings.HasPrefix(upperQuery, "DROP VIEW ") {
+		stmt = p.parseDropView(query)
 	} else if strings.HasPrefix(upperQuery, "BEGIN TRANSACTION") || strings.HasPrefix(upperQuery, "BEGIN") || strings.HasPrefix(upperQuery, "START TRANSACTION") {
 		stmt = p.parseBeginTransaction(query)
 	} else if strings.HasPrefix(upperQuery, "COMMIT") || strings.HasPrefix(upperQuery, "COMMIT TRAN") {
@@ -642,6 +646,68 @@ func (p *Parser) parseDropTable(query string) *Statement {
 		Type: StatementTypeDropTable,
 		DropTable: &DropTableStatement{
 			TableName: tableName,
+		},
+		RawQuery: query,
+	}
+}
+
+// parseCreateView parses a CREATE VIEW statement
+func (p *Parser) parseCreateView(query string) *Statement {
+	// Format: CREATE VIEW view_name AS SELECT ...
+	// Format: CREATE VIEW view_name AS (SELECT ...)
+
+	upperQuery := strings.ToUpper(query)
+
+	// Remove "CREATE VIEW "
+	query = strings.TrimPrefix(query, "CREATE VIEW ")
+	upperQuery = strings.TrimPrefix(upperQuery, "CREATE VIEW ")
+
+	// Find AS keyword
+	asIndex := strings.Index(upperQuery, " AS ")
+	if asIndex == -1 {
+		return &Statement{
+			Type:    StatementTypeCreateView,
+			RawQuery: query,
+		}
+	}
+
+	// Extract view name
+	viewName := strings.TrimSpace(query[:asIndex])
+
+	// Extract SELECT query (everything after AS)
+	selectQuery := strings.TrimSpace(query[asIndex+4:]) // 4 = len(" AS ")
+
+	// Remove parentheses if present (SQL Server style)
+	selectQuery = strings.TrimPrefix(selectQuery, "(")
+	selectQuery = strings.TrimSuffix(selectQuery, ")")
+
+	return &Statement{
+		Type: StatementTypeCreateView,
+		CreateView: &CreateViewStatement{
+			ViewName:  viewName,
+			SelectQuery: selectQuery,
+		},
+		RawQuery: query,
+	}
+}
+
+// parseDropView parses a DROP VIEW statement
+func (p *Parser) parseDropView(query string) *Statement {
+	// Format: DROP VIEW view_name
+
+	upperQuery := strings.ToUpper(query)
+
+	// Remove "DROP VIEW "
+	query = strings.TrimPrefix(query, "DROP VIEW ")
+	upperQuery = strings.TrimPrefix(upperQuery, "DROP VIEW ")
+
+	// Extract view name
+	viewName := strings.TrimSpace(query)
+
+	return &Statement{
+		Type: StatementTypeDropView,
+		DropView: &DropViewStatement{
+			ViewName: viewName,
 		},
 		RawQuery: query,
 	}

@@ -9,13 +9,15 @@ import (
 
 // Executor handles SQL statement execution
 type Executor struct {
-	db *sql.DB
+	db    *sql.DB
+	views map[string]string // Store view name -> SELECT query mapping
 }
 
 // NewExecutor creates a new SQL executor
 func NewExecutor(db *sql.DB) *Executor {
 	return &Executor{
-		db: db,
+		db:    db,
+		views: make(map[string]string),
 	}
 }
 
@@ -57,6 +59,12 @@ func (e *Executor) Execute(query string) (*ExecuteResult, error) {
 
 	case sqlparser.StatementTypeDropTable:
 		return e.executeDropTable(query)
+
+	case sqlparser.StatementTypeCreateView:
+		return e.executeCreateView(query)
+
+	case sqlparser.StatementTypeDropView:
+		return e.executeDropView(query)
 
 	case sqlparser.StatementTypeBeginTransaction:
 		return e.executeBeginTransaction(query)
@@ -281,6 +289,65 @@ func (e *Executor) executeDropTable(query string) (*ExecuteResult, error) {
 		RowCount: 0,
 		IsQuery:  false,
 		Message:  "Table dropped successfully",
+	}, nil
+}
+
+// executeCreateView executes a CREATE VIEW statement
+func (e *Executor) executeCreateView(query string) (*ExecuteResult, error) {
+	// Parse query to get view information
+	stmt, err := sqlparser.NewParser().Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CREATE VIEW: %w", err)
+	}
+
+	if stmt.Type != sqlparser.StatementTypeCreateView || stmt.CreateView == nil {
+		return nil, fmt.Errorf("invalid CREATE VIEW statement")
+	}
+
+	// Store view definition
+	e.views[stmt.CreateView.ViewName] = stmt.CreateView.SelectQuery
+
+	// Execute CREATE VIEW on SQLite (SQLite supports CREATE VIEW natively)
+	_, err = e.db.Exec(query)
+	if err != nil {
+		// If SQLite fails, we still have the view definition stored
+		// This allows us to handle queries against the view
+		return nil, fmt.Errorf("failed to create view in SQLite: %w (view definition stored)", err)
+	}
+
+	return &ExecuteResult{
+		RowCount: 0,
+		IsQuery:  false,
+		Message:  fmt.Sprintf("View '%s' created successfully", stmt.CreateView.ViewName),
+	}, nil
+}
+
+// executeDropView executes a DROP VIEW statement
+func (e *Executor) executeDropView(query string) (*ExecuteResult, error) {
+	// Parse query to get view name
+	stmt, err := sqlparser.NewParser().Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DROP VIEW: %w", err)
+	}
+
+	if stmt.Type != sqlparser.StatementTypeDropView || stmt.DropView == nil {
+		return nil, fmt.Errorf("invalid DROP VIEW statement")
+	}
+
+	// Remove view definition
+	delete(e.views, stmt.DropView.ViewName)
+
+	// Execute DROP VIEW on SQLite (SQLite supports DROP VIEW natively)
+	_, err = e.db.Exec(query)
+	if err != nil {
+		// If SQLite fails, we still removed the view definition
+		return nil, fmt.Errorf("failed to drop view in SQLite: %w (view definition removed)", err)
+	}
+
+	return &ExecuteResult{
+		RowCount: 0,
+		IsQuery:  false,
+		Message:  fmt.Sprintf("View '%s' dropped successfully", stmt.DropView.ViewName),
 	}, nil
 }
 

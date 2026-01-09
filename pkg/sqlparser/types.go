@@ -11,6 +11,8 @@ const (
 	StatementTypeDelete
 	StatementTypeCreateTable
 	StatementTypeDropTable
+	StatementTypeCreateView
+	StatementTypeDropView
 	StatementTypeBeginTransaction
 	StatementTypeCommit
 	StatementTypeRollback
@@ -31,6 +33,10 @@ func (st StatementType) String() string {
 		return "CREATE TABLE"
 	case StatementTypeDropTable:
 		return "DROP TABLE"
+	case StatementTypeCreateView:
+		return "CREATE VIEW"
+	case StatementTypeDropView:
+		return "DROP VIEW"
 	case StatementTypeBeginTransaction:
 		return "BEGIN TRANSACTION"
 	case StatementTypeCommit:
@@ -114,6 +120,17 @@ type DropTableStatement struct {
 	TableName string
 }
 
+// CreateViewStatement represents a CREATE VIEW statement
+type CreateViewStatement struct {
+	ViewName  string
+	SelectQuery string // The SELECT query that defines the view
+}
+
+// DropViewStatement represents a DROP VIEW statement
+type DropViewStatement struct {
+	ViewName string
+}
+
 // BeginTransactionStatement represents a BEGIN TRANSACTION statement
 type BeginTransactionStatement struct {
 	Name string // Optional transaction name (for named transactions)
@@ -146,6 +163,8 @@ type Statement struct {
 	Delete                 *DeleteStatement
 	CreateTable            *CreateTableStatement
 	DropTable              *DropTableStatement
+	CreateView             *CreateViewStatement
+	DropView               *DropViewStatement
 	BeginTransaction       *BeginTransactionStatement
 	Commit                *CommitStatement
 	Rollback              *RollbackStatement
