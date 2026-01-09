@@ -5,21 +5,32 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/factory/mssql-tds-server/pkg/database"
 	"github.com/factory/mssql-tds-server/pkg/sqlparser"
 )
 
 // Executor handles SQL statement execution
 type Executor struct {
 	db              *sql.DB
+	catalog         *database.Catalog         // Database catalog
+	connections     map[string]*sql.DB         // All database connections
+	currentDB       *sql.DB                  // Currently active database
+	currentDBName   string                   // Currently active database name
+	attachedDBs     map[string]bool           // Currently attached databases
 	views           map[string]string             // Store view name -> SELECT query mapping
 	preparedStmts   map[string]*sql.Stmt         // Store prepared statements
 	preparedSQL     map[string]string             // Store prepared SQL for parameter substitution
 }
 
 // NewExecutor creates a new SQL executor
-func NewExecutor(db *sql.DB) *Executor {
+func NewExecutor(db *sql.DB, catalog *database.Catalog) *Executor {
 	return &Executor{
 		db:            db,
+		catalog:       catalog,
+		connections:   make(map[string]*sql.DB),
+		currentDB:     db,
+		currentDBName: "",
+		attachedDBs:   make(map[string]bool),
 		views:         make(map[string]string),
 		preparedStmts: make(map[string]*sql.Stmt),
 		preparedSQL:   make(map[string]string),
@@ -756,4 +767,41 @@ func ConvertValueToString(value interface{}) string {
 	default:
 		return fmt.Sprintf("%v", value)
 	}
+}
+
+// executeSysDatabases executes a query on sys.databases
+func (e *Executor) executeSysDatabases() (*ExecuteResult, error) {
+	rows, err := e.ExecuteSysDatabasesQuery()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Get columns
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("error getting columns: %w", err)
+	}
+
+	// Read all rows
+	var rowValues [][]interface{}
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		ptrs := make([]interface{}, len(columns))
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+
+		rowValues = append(rowValues, values)
+	}
+
+	return &ExecuteResult{
+		Columns: columns,
+		Rows:    rowValues,
+		IsQuery: true,
+	}, nil
 }

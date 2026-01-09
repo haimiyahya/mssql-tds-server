@@ -47,6 +47,12 @@ func (p *Parser) Parse(query string) (*Statement, error) {
 		stmt = p.parseDropView(query)
 	} else if strings.HasPrefix(upperQuery, "CREATE INDEX ") || strings.HasPrefix(upperQuery, "CREATE UNIQUE INDEX ") {
 		stmt = p.parseCreateIndex(query)
+	} else if strings.HasPrefix(upperQuery, "CREATE DATABASE ") {
+		stmt = p.parseCreateDatabase(query)
+	} else if strings.HasPrefix(upperQuery, "DROP DATABASE ") {
+		stmt = p.parseDropDatabase(query)
+	} else if strings.HasPrefix(upperQuery, "USE ") {
+		stmt = p.parseUseDatabase(query)
 	} else if strings.HasPrefix(upperQuery, "DROP INDEX ") {
 		stmt = p.parseDropIndex(query)
 	} else if strings.HasPrefix(upperQuery, "PREPARE ") {

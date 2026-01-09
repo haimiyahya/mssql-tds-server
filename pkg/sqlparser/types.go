@@ -26,6 +26,9 @@ const (
 	StatementTypeBeginTransaction
 	StatementTypeCommit
 	StatementTypeRollback
+	StatementTypeCreateDatabase
+	StatementTypeDropDatabase
+	StatementTypeUseDatabase
 )
 
 // String returns the string representation of StatementType
@@ -65,6 +68,12 @@ func (st StatementType) String() string {
 		return "COMMIT"
 	case StatementTypeRollback:
 		return "ROLLBACK"
+	case StatementTypeCreateDatabase:
+		return "CREATE DATABASE"
+	case StatementTypeDropDatabase:
+		return "DROP DATABASE"
+	case StatementTypeUseDatabase:
+		return "USE DATABASE"
 	default:
 		return "UNKNOWN"
 	}
@@ -211,6 +220,21 @@ type RollbackStatement struct {
 	SavepointName string // Optional savepoint name for ROLLBACK TO SAVEPOINT
 }
 
+// CreateDatabaseStatement represents a CREATE DATABASE statement
+type CreateDatabaseStatement struct {
+	DatabaseName string
+}
+
+// DropDatabaseStatement represents a DROP DATABASE statement
+type DropDatabaseStatement struct {
+	DatabaseName string
+}
+
+// UseDatabaseStatement represents a USE DATABASE statement
+type UseDatabaseStatement struct {
+	DatabaseName string
+}
+
 // ColumnDefinition represents a column definition in CREATE TABLE
 type ColumnDefinition struct {
 	Name       string
@@ -258,5 +282,8 @@ type Statement struct {
 	BeginTransaction       *BeginTransactionStatement
 	Commit                *CommitStatement
 	Rollback              *RollbackStatement
+	CreateDatabase      *CreateDatabaseStatement
+	DropDatabase        *DropDatabaseStatement
+	UseDatabase         *UseDatabaseStatement
 	RawQuery               string
 }

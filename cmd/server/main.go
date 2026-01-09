@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/factory/mssql-tds-server/pkg/database"
 	"github.com/factory/mssql-tds-server/pkg/procedure"
 	"github.com/factory/mssql-tds-server/pkg/sqlexecutor"
 	"github.com/factory/mssql-tds-server/pkg/sqlite"
@@ -19,6 +20,7 @@ const (
 type Server struct {
 	addr                 string
 	db                   *sqlite.Database
+	catalog              *database.Catalog
 	procedureStorage      *procedure.Storage
 	procedureExecutor     *procedure.Executor
 	queryProcessor       *tds.QueryProcessor
@@ -52,7 +54,13 @@ func NewServer(port int, dbPath string) (*Server, error) {
 	}
 
 	// Create SQL executor for plain SQL execution
-	sqlExec := sqlexecutor.NewExecutor(db.GetDB())
+	// Initialize database catalog
+	catalog := database.NewCatalog("./data", db.GetDB())
+	if catalog == nil {
+		return nil, fmt.Errorf("failed to create database catalog")
+	}
+
+	sqlExec := sqlexecutor.NewExecutor(db.GetDB(), catalog)
 
 	// Create query processor and set SQL executor
 	queryProc := tds.NewQueryProcessor()
