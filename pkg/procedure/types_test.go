@@ -1,10 +1,19 @@
 package procedure
 
 import (
+	"fmt"
 	"testing"
 )
 
+func debugLog(t *testing.T, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	t.Log("DEBUG:", msg)
+	fmt.Println("DEBUG:", msg)
+}
+
 func TestParseCreateProcedure(t *testing.T) {
+	debugLog(t, "TestParseCreateProcedure: START")
+	
 	tests := []struct {
 		name        string
 		sql         string
@@ -62,6 +71,7 @@ func TestParseCreateProcedure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			debugLog(t, "TestParseCreateProcedure/%s: START", tt.name)
 			proc, err := ParseCreateProcedure(tt.sql)
 
 			if tt.wantErr {
@@ -72,6 +82,7 @@ func TestParseCreateProcedure(t *testing.T) {
 				if tt.errContains != "" && !containsString(err.Error(), tt.errContains) {
 					t.Errorf("ParseCreateProcedure() error = %v, want error containing %s", err, tt.errContains)
 				}
+				debugLog(t, "TestParseCreateProcedure/%s: END (expected error)", tt.name)
 				return
 			}
 
@@ -91,11 +102,15 @@ func TestParseCreateProcedure(t *testing.T) {
 			if len(proc.Parameters) != tt.wantParams {
 				t.Errorf("ParseCreateProcedure() Parameters count = %v, want %v", len(proc.Parameters), tt.wantParams)
 			}
+			debugLog(t, "TestParseCreateProcedure/%s: END", tt.name)
 		})
 	}
+	debugLog(t, "TestParseCreateProcedure: END")
 }
 
 func TestParseParameters(t *testing.T) {
+	debugLog(t, "TestParseParameters: START")
+	
 	tests := []struct {
 		name      string
 		paramsStr string
@@ -136,12 +151,14 @@ func TestParseParameters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			debugLog(t, "TestParseParameters/%s: START", tt.name)
 			params, err := parseParameters(tt.paramsStr)
 
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("parseParameters() expected error but got none")
 				}
+				debugLog(t, "TestParseParameters/%s: END (expected error)", tt.name)
 				return
 			}
 
@@ -153,11 +170,15 @@ func TestParseParameters(t *testing.T) {
 			if len(params) != tt.wantCount {
 				t.Errorf("parseParameters() count = %v, want %v", len(params), tt.wantCount)
 			}
+			debugLog(t, "TestParseParameters/%s: END", tt.name)
 		})
 	}
+	debugLog(t, "TestParseParameters: END")
 }
 
 func TestParametersToJSON(t *testing.T) {
+	debugLog(t, "TestParametersToJSON: START")
+	
 	params := []Parameter{
 		{Name: "id", Type: "INT"},
 		{Name: "name", Type: "VARCHAR", Length: 50},
@@ -182,9 +203,12 @@ func TestParametersToJSON(t *testing.T) {
 	if len(params2) != len(params) {
 		t.Errorf("Parameters count mismatch: got %d, want %d", len(params2), len(params))
 	}
+	debugLog(t, "TestParametersToJSON: END")
 }
 
 func TestParametersFromJSON(t *testing.T) {
+	debugLog(t, "TestParametersFromJSON: START")
+	
 	tests := []struct {
 		name      string
 		json      string
@@ -213,12 +237,14 @@ func TestParametersFromJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			debugLog(t, "TestParametersFromJSON/%s: START", tt.name)
 			params, err := ParametersFromJSON(tt.json)
 
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("ParametersFromJSON() expected error but got none")
 				}
+				debugLog(t, "TestParametersFromJSON/%s: END (expected error)", tt.name)
 				return
 			}
 
@@ -230,11 +256,15 @@ func TestParametersFromJSON(t *testing.T) {
 			if len(params) != tt.wantCount {
 				t.Errorf("ParametersFromJSON() count = %v, want %v", len(params), tt.wantCount)
 			}
+			debugLog(t, "TestParametersFromJSON/%s: END", tt.name)
 		})
 	}
+	debugLog(t, "TestParametersFromJSON: END")
 }
 
 func TestSplitByCommaOutsideParentheses(t *testing.T) {
+	debugLog(t, "TestSplitByCommaOutsideParentheses: START")
+	
 	tests := []struct {
 		name     string
 		input    string
@@ -259,12 +289,15 @@ func TestSplitByCommaOutsideParentheses(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			debugLog(t, "TestSplitByCommaOutsideParentheses/%s: START", tt.name)
 			result := splitByCommaOutsideParentheses(tt.input)
 			if len(result) != tt.wantLen {
 				t.Errorf("splitByCommaOutsideParentheses() = %v, want len %v", result, tt.wantLen)
 			}
+			debugLog(t, "TestSplitByCommaOutsideParentheses/%s: END", tt.name)
 		})
 	}
+	debugLog(t, "TestSplitByCommaOutsideParentheses: END")
 }
 
 // Helper function

@@ -1,67 +1,97 @@
 package procedure
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/factory/mssql-tds-server/pkg/sqlite"
 )
 
+func debugLog(t *testing.T, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	t.Log("DEBUG:", msg)
+	fmt.Println("DEBUG:", msg)
+}
+
 func setupExecutor(t *testing.T) (*Executor, *Storage, func()) {
+	debugLog(t, "setupExecutor: START")
+	
 	// Create temporary database
 	dbPath := "/tmp/test_executor.db"
+	debugLog(t, "setupExecutor: Removing db file: %s", dbPath)
 	os.Remove(dbPath) // Clean up any existing file
 
+	debugLog(t, "setupExecutor: Creating database")
 	db, err := sqlite.NewDatabase(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
+	debugLog(t, "setupExecutor: Database created")
 
+	debugLog(t, "setupExecutor: Initializing database")
 	err = db.Initialize()
 	if err != nil {
 		t.Fatalf("Failed to initialize database: %v", err)
 	}
+	debugLog(t, "setupExecutor: Database initialized")
 
 	// Create a test table for queries
+	debugLog(t, "setupExecutor: Creating test table")
 	_, err = db.GetDB().Exec("CREATE TABLE IF NOT EXISTS users (id INTEGER, name TEXT, department TEXT)")
 	if err != nil {
 		t.Fatalf("Failed to create test table: %v", err)
 	}
+	debugLog(t, "setupExecutor: Test table created")
 
 	// Insert test data
+	debugLog(t, "setupExecutor: Inserting test data (row 1)")
 	_, err = db.GetDB().Exec("INSERT INTO users (id, name, department) VALUES (1, 'Alice', 'Engineering')")
 	if err != nil {
 		t.Fatalf("Failed to insert test data: %v", err)
 	}
+	debugLog(t, "setupExecutor: Test data row 1 inserted")
+
+	debugLog(t, "setupExecutor: Inserting test data (row 2)")
 	_, err = db.GetDB().Exec("INSERT INTO users (id, name, department) VALUES (2, 'Bob', 'Marketing')")
 	if err != nil {
 		t.Fatalf("Failed to insert test data: %v", err)
 	}
+	debugLog(t, "setupExecutor: Test data row 2 inserted")
 
+	debugLog(t, "setupExecutor: Creating storage")
 	storage, err := NewStorage(db)
 	if err != nil {
 		t.Fatalf("Failed to create storage: %v", err)
 	}
+	debugLog(t, "setupExecutor: Storage created")
 
+	debugLog(t, "setupExecutor: Creating executor")
 	executor, err := NewExecutor(db, storage)
 	if err != nil {
 		t.Fatalf("Failed to create executor: %v", err)
 	}
+	debugLog(t, "setupExecutor: Executor created")
 
 	// Cleanup function
 	cleanup := func() {
+		debugLog(t, "setupExecutor: Cleanup called")
 		db.Close()
 		os.Remove(dbPath)
 	}
 
+	debugLog(t, "setupExecutor: END")
 	return executor, storage, cleanup
 }
 
 func TestExecutor_Execute(t *testing.T) {
+	debugLog(t, "TestExecutor_Execute: START")
+	
 	executor, storage, cleanup := setupExecutor(t)
 	defer cleanup()
 
 	// Create a procedure
+	debugLog(t, "TestExecutor_Execute: Creating procedure")
 	proc := &Procedure{
 		Name: "GET_USER_BY_ID",
 		Body: "SELECT * FROM users WHERE id = @id",
@@ -74,8 +104,10 @@ func TestExecutor_Execute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create procedure: %v", err)
 	}
+	debugLog(t, "TestExecutor_Execute: Procedure created")
 
-	// Execute the procedure
+	// Execute procedure
+	debugLog(t, "TestExecutor_Execute: Executing procedure")
 	paramValues := map[string]interface{}{
 		"@id": 1,
 	}
@@ -84,14 +116,18 @@ func TestExecutor_Execute(t *testing.T) {
 	if err != nil {
 		t.Errorf("Execute() error = %v", err)
 	}
+	debugLog(t, "TestExecutor_Execute: Procedure executed, results: %d", len(results))
 
 	// Check results (should have header + 1 data row)
 	if len(results) != 2 {
 		t.Errorf("Execute() returned %d rows, want 2", len(results))
 	}
+	debugLog(t, "TestExecutor_Execute: END")
 }
 
 func TestExecutor_Execute_MissingParameter(t *testing.T) {
+	debugLog(t, "TestExecutor_Execute_MissingParameter: START")
+	
 	executor, storage, cleanup := setupExecutor(t)
 	defer cleanup()
 
@@ -116,9 +152,12 @@ func TestExecutor_Execute_MissingParameter(t *testing.T) {
 	if err == nil {
 		t.Error("Execute() expected error for missing required parameter")
 	}
+	debugLog(t, "TestExecutor_Execute_MissingParameter: END")
 }
 
 func TestExecutor_Execute_NonexistentProcedure(t *testing.T) {
+	debugLog(t, "TestExecutor_Execute_NonexistentProcedure: START")
+	
 	executor, _, cleanup := setupExecutor(t)
 	defer cleanup()
 
@@ -130,9 +169,12 @@ func TestExecutor_Execute_NonexistentProcedure(t *testing.T) {
 	if err == nil {
 		t.Error("Execute() expected error for non-existent procedure")
 	}
+	debugLog(t, "TestExecutor_Execute_NonexistentProcedure: END")
 }
 
 func TestExecutor_Execute_StringParameter(t *testing.T) {
+	debugLog(t, "TestExecutor_Execute_StringParameter: START")
+	
 	executor, storage, cleanup := setupExecutor(t)
 	defer cleanup()
 
@@ -164,9 +206,12 @@ func TestExecutor_Execute_StringParameter(t *testing.T) {
 	if len(results) < 2 {
 		t.Errorf("Execute() returned %d rows, want at least 2", len(results))
 	}
+	debugLog(t, "TestExecutor_Execute_StringParameter: END")
 }
 
 func TestExecutor_Execute_StringWithQuotes(t *testing.T) {
+	debugLog(t, "TestExecutor_Execute_StringWithQuotes: START")
+	
 	executor, storage, cleanup := setupExecutor(t)
 	defer cleanup()
 
@@ -198,9 +243,12 @@ func TestExecutor_Execute_StringWithQuotes(t *testing.T) {
 	if len(results) < 2 {
 		t.Errorf("Execute() returned %d rows, want at least 2", len(results))
 	}
+	debugLog(t, "TestExecutor_Execute_StringWithQuotes: END")
 }
 
 func TestExecutor_ValidateParameters(t *testing.T) {
+	debugLog(t, "TestExecutor_ValidateParameters: START")
+	
 	executor, _, cleanup := setupExecutor(t)
 	defer cleanup()
 
@@ -241,6 +289,7 @@ func TestExecutor_ValidateParameters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			debugLog(t, "TestExecutor_ValidateParameters/%s: START", tt.name)
 			err := executor.validateParameters(proc, tt.params)
 
 			if tt.wantErr {
@@ -256,11 +305,15 @@ func TestExecutor_ValidateParameters(t *testing.T) {
 					t.Errorf("validateParameters() unexpected error = %v", err)
 				}
 			}
+			debugLog(t, "TestExecutor_ValidateParameters/%s: END", tt.name)
 		})
 	}
+	debugLog(t, "TestExecutor_ValidateParameters: END")
 }
 
 func TestExecutor_ReplaceParameters(t *testing.T) {
+	debugLog(t, "TestExecutor_ReplaceParameters: START")
+	
 	executor, _, cleanup := setupExecutor(t)
 	defer cleanup()
 
@@ -304,6 +357,7 @@ func TestExecutor_ReplaceParameters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			debugLog(t, "TestExecutor_ReplaceParameters/%s: START", tt.name)
 			result, err := executor.replaceParameters(tt.sql, tt.params)
 			if err != nil {
 				t.Errorf("replaceParameters() error = %v", err)
@@ -312,11 +366,15 @@ func TestExecutor_ReplaceParameters(t *testing.T) {
 			if result != tt.want {
 				t.Errorf("replaceParameters() = %v, want %v", result, tt.want)
 			}
+			debugLog(t, "TestExecutor_ReplaceParameters/%s: END", tt.name)
 		})
 	}
+	debugLog(t, "TestExecutor_ReplaceParameters: END")
 }
 
 func TestExecutor_FormatValue(t *testing.T) {
+	debugLog(t, "TestExecutor_FormatValue: START")
+	
 	executor, _, cleanup := setupExecutor(t)
 	defer cleanup()
 
@@ -359,10 +417,13 @@ func TestExecutor_FormatValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			debugLog(t, "TestExecutor_FormatValue/%s: START", tt.name)
 			result := executor.formatValue(tt.value)
 			if result != tt.want {
 				t.Errorf("formatValue() = %v, want %v", result, tt.want)
 			}
+			debugLog(t, "TestExecutor_FormatValue/%s: END", tt.name)
 		})
 	}
+	debugLog(t, "TestExecutor_FormatValue: END")
 }
