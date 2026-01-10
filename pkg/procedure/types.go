@@ -48,6 +48,7 @@ func ParseCreateProcedure(sql string) (*Procedure, error) {
 	// Parse name and parameters from beforeAS
 	// Format 1: CREATE PROCEDURE name (@params) AS body
 	// Format 2: CREATE PROCEDURE name @param1 type, @param2 type AS body
+	// Format 3: CREATE PROC name @param1 type AS body
 	name := ""
 	paramsStr := ""
 
@@ -62,15 +63,30 @@ func ParseCreateProcedure(sql string) (*Procedure, error) {
 		}
 	} else {
 		// Format without parentheses
-		// Name is first word after CREATE PROCEDURE
+		// Name is first word after CREATE PROCEDURE or CREATE PROC
 		parts := strings.Fields(beforeAS)
-		if len(parts) < 1 {
+		if len(parts) < 2 {
 			return nil, fmt.Errorf("invalid CREATE PROCEDURE syntax: missing procedure name")
 		}
-		name = parts[1]  // parts[0] is "CREATE", parts[1] is name
-		if len(parts) > 2 {
-			// Everything after name is parameters
-			paramsStr = strings.TrimSpace(strings.Join(parts[2:], " "))
+		
+		// Determine which keyword format was used
+		// sql is already uppercased from line 32
+		if strings.HasPrefix(sql, "CREATE PROCEDURE") {
+			// Format: CREATE PROCEDURE name @param
+			// parts = ["CREATE", "PROCEDURE", "name", "@param", ...]
+			// Skip parts[0] and parts[1], use parts[2] as name
+			name = parts[2]
+			if len(parts) > 3 {
+				paramsStr = strings.TrimSpace(strings.Join(parts[3:], " "))
+			}
+		} else {
+			// Format: CREATE PROC name @param
+			// parts = ["CREATE", "PROC", "name", "@param", ...]
+			// Skip parts[0], use parts[2] as name
+			name = parts[2]
+			if len(parts) > 3 {
+				paramsStr = strings.TrimSpace(strings.Join(parts[3:], " "))
+			}
 		}
 	}
 
