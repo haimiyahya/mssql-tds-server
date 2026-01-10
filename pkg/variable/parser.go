@@ -54,8 +54,15 @@ func ParseProcedureBody(body string) ([]string, error) {
 	for _, ch := range body {
 		switch ch {
 		case '\'':
-			inQuotes = !inQuotes
-			current += string(ch)
+			// Check if quote is escaped (preceded by backslash)
+			if len(current) > 0 && current[len(current)-1] == '\\' {
+				// Escaped quote, don't toggle inQuotes
+				current += string(ch)
+			} else {
+				// Regular quote, toggle inQuotes
+				inQuotes = !inQuotes
+				current += string(ch)
+			}
 		case '(':
 			if !inQuotes {
 				inParentheses++
