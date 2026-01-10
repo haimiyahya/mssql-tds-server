@@ -69,10 +69,13 @@ func ParseCondition(expr string) (*LogicalCondition, error) {
 		// Find operator and extract right side properly
 		rightPart := strings.TrimSpace(expr[andOrPos:])
 		rightExpr := ""
+		logicalOp := LogicalOperator("")
 		if strings.HasPrefix(strings.ToUpper(rightPart), "AND ") {
 			rightExpr = strings.TrimSpace(rightPart[4:])
+			logicalOp = LogOpAnd
 		} else if strings.HasPrefix(strings.ToUpper(rightPart), "OR ") {
 			rightExpr = strings.TrimSpace(rightPart[3:])
+			logicalOp = LogOpOr
 		} else {
 			rightExpr = rightPart
 		}
@@ -89,7 +92,7 @@ func ParseCondition(expr string) (*LogicalCondition, error) {
 
 		return &LogicalCondition{
 			Left:     left,
-			Operator:  "AND",
+			Operator:  logicalOp,
 			Right:    right,
 		}, nil
 	}
