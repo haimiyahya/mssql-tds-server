@@ -27,23 +27,27 @@ type Procedure struct {
 
 // ParseCreateProcedure parses a CREATE PROCEDURE statement
 func ParseCreateProcedure(sql string) (*Procedure, error) {
-	// Normalize SQL
-	sql = strings.TrimSpace(sql)
-	sql = strings.ToUpper(sql)
+	// Store original SQL string for body extraction
+	originalSQL := strings.TrimSpace(sql)
+	
+	// Normalize SQL for parsing (convert to uppercase for keyword matching)
+	normalizedSQL := strings.ToUpper(originalSQL)
 
 	// Check if it starts with CREATE PROCEDURE or CREATE PROC
-	if !strings.HasPrefix(sql, "CREATE PROCEDURE") && !strings.HasPrefix(sql, "CREATE PROC") {
+	if !strings.HasPrefix(normalizedSQL, "CREATE PROCEDURE") && !strings.HasPrefix(normalizedSQL, "CREATE PROC") {
 		return nil, fmt.Errorf("not a CREATE PROCEDURE statement")
 	}
 
 	// Find AS keyword to separate name+params from body
-	asPos := strings.Index(sql, " AS ")
+	asPos := strings.Index(normalizedSQL, " AS ")
 	if asPos < 0 {
 		return nil, fmt.Errorf("invalid CREATE PROCEDURE syntax: missing AS keyword")
 	}
 
-	beforeAS := strings.TrimSpace(sql[:asPos])
-	bodyStr := strings.TrimSpace(sql[asPos+4:])
+	beforeAS := strings.TrimSpace(normalizedSQL[:asPos])
+	
+	// Extract body from original SQL string to preserve case
+	bodyStr := strings.TrimSpace(originalSQL[asPos+4:])
 
 	// Parse name and parameters from beforeAS
 	// Format 1: CREATE PROCEDURE name (@params) AS body
@@ -52,41 +56,40 @@ func ParseCreateProcedure(sql string) (*Procedure, error) {
 	name := ""
 	paramsStr := ""
 
-	parenPos := strings.Index(beforeAS, "(")
-	if parenPos >= 0 {
-		// Format with parentheses
-		name = strings.TrimSpace(beforeAS[:parenPos])
-		// Find closing parenthesis
-		closeParenPos := strings.Index(beforeAS, ")")
-		if closeParenPos >= 0 {
-			paramsStr = strings.TrimSpace(beforeAS[parenPos+1 : closeParenPos])
+	// Remove "CREATE PROCEDURE" or "CREATE PROC" prefix
+	withoutPrefix := beforeAS
+	if strings.HasPrefix(beforeAS, "CREATE PROCEDURE ") {
+		withoutPrefix = strings.TrimPrefix(beforeAS, "CREATE PROCEDURE ")
+	} else if strings.HasPrefix(beforeAS, "CREATE PROC ") {
+		withoutPrefix = strings.TrimPrefix(beforeAS, "CREATE PROC ")
+	} else {
+		// Fallback - remove any whitespace after keyword
+		withoutPrefix = strings.TrimPrefix(beforeAS, "CREATE PROCEDURE")
+		withoutPrefix = strings.TrimPrefix(withoutPrefix, "CREATE PROC")
+		withoutPrefix = strings.TrimSpace(withoutPrefix)
+	}
+	
+	// Check if format has parentheses (for parameter list): name (...)
+	// The name should be followed immediately by space and (
+	openParenAfterNamePos := strings.Index(withoutPrefix, " (")
+	if openParenAfterNamePos > 0 {
+		// Format with parentheses: name (@params)
+		name = strings.TrimSpace(withoutPrefix[:openParenAfterNamePos])
+		// Extract params between ( and )
+		openParen := strings.Index(withoutPrefix[openParenAfterNamePos:], "(")
+		closeParen := strings.LastIndex(withoutPrefix, ")")
+		if openParen >= 0 && closeParen >= 0 {
+			paramsStr = strings.TrimSpace(withoutPrefix[openParenAfterNamePos+openParen+1 : closeParen])
 		}
 	} else {
-		// Format without parentheses
-		// Name is first word after CREATE PROCEDURE or CREATE PROC
-		parts := strings.Fields(beforeAS)
-		if len(parts) < 2 {
-			return nil, fmt.Errorf("invalid CREATE PROCEDURE syntax: missing procedure name")
-		}
-		
-		// Determine which keyword format was used
-		// sql is already uppercased from line 32
-		if strings.HasPrefix(sql, "CREATE PROCEDURE") {
-			// Format: CREATE PROCEDURE name @param
-			// parts = ["CREATE", "PROCEDURE", "name", "@param", ...]
-			// Skip parts[0] and parts[1], use parts[2] as name
-			name = parts[2]
-			if len(parts) > 3 {
-				paramsStr = strings.TrimSpace(strings.Join(parts[3:], " "))
-			}
+		// Format without parentheses: name @param1 type, @param2 type
+		// Find first @ to get name and params
+		atPos := strings.Index(withoutPrefix, "@")
+		if atPos >= 0 {
+			name = strings.TrimSpace(withoutPrefix[:atPos])
+			paramsStr = strings.TrimSpace(withoutPrefix[atPos:])
 		} else {
-			// Format: CREATE PROC name @param
-			// parts = ["CREATE", "PROC", "name", "@param", ...]
-			// Skip parts[0], use parts[2] as name
-			name = parts[2]
-			if len(parts) > 3 {
-				paramsStr = strings.TrimSpace(strings.Join(parts[3:], " "))
-			}
+			name = strings.TrimSpace(withoutPrefix)
 		}
 	}
 

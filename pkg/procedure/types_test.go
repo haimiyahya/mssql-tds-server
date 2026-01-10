@@ -1,15 +1,9 @@
 package procedure
 
 import (
-	"fmt"
 	"testing"
 )
 
-func debugLog(t *testing.T, format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
-	t.Log("DEBUG:", msg)
-	fmt.Println("DEBUG:", msg)
-}
 
 func TestParseCreateProcedure(t *testing.T) {
 	debugLog(t, "TestParseCreateProcedure: START")

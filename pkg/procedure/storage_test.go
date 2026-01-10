@@ -1,18 +1,12 @@
 package procedure
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
 	"github.com/factory/mssql-tds-server/pkg/sqlite"
 )
 
-func debugLog(t *testing.T, format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
-	t.Log("DEBUG:", msg)
-	fmt.Println("DEBUG:", msg)
-}
 
 func setupTestDB(t *testing.T) (*sqlite.Database, *Storage, func()) {
 	debugLog(t, "setupTestDB: START")
